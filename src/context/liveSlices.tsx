@@ -6,16 +6,9 @@ import { usePolling } from '@/hooks/usePolling';
 import { ApiError, api } from '@/services/client/api';
 import type { GateEvent } from '@/types/admin';
 
-const GATE_EVENT_HISTORY_LIMIT = 50;
-
 type SliceLoaders = Partial<{
     [Key in AppSliceKey]: (signal: AbortSignal) => Promise<AppSlices[Key]>;
 }>;
-
-const sliceLoaders: SliceLoaders = {
-    dashboard: api.dashboard.get,
-    gateProgress: api.checkIns.progress,
-};
 
 type LivePollingOptions<T> = {
     intervalMs: number;
@@ -23,6 +16,50 @@ type LivePollingOptions<T> = {
     onData?: (data: T) => void;
     immediate?: boolean;
 };
+
+const GATE_EVENT_HISTORY_LIMIT = 50;
+
+const sliceLoaders: SliceLoaders = {
+    dashboard: api.dashboard.get,
+    gateProgress: api.checkIns.progress,
+};
+
+function LiveSlice<Key extends AppSliceKey>({
+    sliceKey,
+    intervalMs,
+}: {
+    sliceKey: Key;
+    intervalMs: number;
+}) {
+    const { store } = useAppRuntime();
+    const load = sliceLoaders[sliceKey] as
+        ((signal: AbortSignal) => Promise<AppSlices[Key]>) | undefined;
+    const initialData = store.getState()[sliceKey];
+
+    if (!load) throw new Error(`App slice "${sliceKey}" has no loader`);
+
+    if (!initialData) throw new Error(`App slice "${sliceKey}" is not provided`);
+
+    const replaceChangedParts = useCallback(
+        (value: AppSlices[Key]) => {
+            const current = store.getState()[sliceKey];
+            const merged = keepUnchangedParts<AppSlices[Key]>(current, value);
+
+            if (merged !== current) store.replaceSlice(sliceKey, merged);
+        },
+        [store, sliceKey],
+    );
+
+    const { refresh } = useLivePolling(load, {
+        intervalMs,
+        initialData,
+        onData: replaceChangedParts,
+    });
+
+    useEffect(() => store.registerRefresher(sliceKey, refresh), [refresh, sliceKey, store]);
+
+    return null;
+}
 
 export function keepUnchangedParts<T extends object>(previous: T | undefined, next: T): T {
     if (!previous) return next;
@@ -111,43 +148,6 @@ export function useLivePolling<T>(
         onError: handleError,
         enabled: !isSignedOut,
     });
-}
-
-function LiveSlice<Key extends AppSliceKey>({
-    sliceKey,
-    intervalMs,
-}: {
-    sliceKey: Key;
-    intervalMs: number;
-}) {
-    const { store } = useAppRuntime();
-    const load = sliceLoaders[sliceKey] as
-        ((signal: AbortSignal) => Promise<AppSlices[Key]>) | undefined;
-    const initialData = store.getState()[sliceKey];
-
-    if (!load) throw new Error(`App slice "${sliceKey}" has no loader`);
-
-    if (!initialData) throw new Error(`App slice "${sliceKey}" is not provided`);
-
-    const replaceChangedParts = useCallback(
-        (value: AppSlices[Key]) => {
-            const current = store.getState()[sliceKey];
-            const merged = keepUnchangedParts<AppSlices[Key]>(current, value);
-
-            if (merged !== current) store.replaceSlice(sliceKey, merged);
-        },
-        [store, sliceKey],
-    );
-
-    const { refresh } = useLivePolling(load, {
-        intervalMs,
-        initialData,
-        onData: replaceChangedParts,
-    });
-
-    useEffect(() => store.registerRefresher(sliceKey, refresh), [refresh, sliceKey, store]);
-
-    return null;
 }
 
 export function LiveSlices({ slices }: { slices: Partial<Record<AppSliceKey, number>> }) {

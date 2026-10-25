@@ -27,6 +27,15 @@ export type Poller<T> = {
     setLoad: (load: Load<T>) => void;
 };
 
+type PollingOptions<T> = {
+    intervalMs: number;
+    initialData: T;
+    onData?: (data: T) => void;
+    onError?: (error: unknown) => void;
+    immediate?: boolean;
+    enabled?: boolean;
+};
+
 const TIMEOUT_INTERVALS = 2;
 
 const documentVisibility: Visibility = {
@@ -168,15 +177,6 @@ export function createPoller<T>({
         },
     };
 }
-
-type PollingOptions<T> = {
-    intervalMs: number;
-    initialData: T;
-    onData?: (data: T) => void;
-    onError?: (error: unknown) => void;
-    immediate?: boolean;
-    enabled?: boolean;
-};
 
 export function usePolling<T>(
     load: Load<T>,

@@ -1,5 +1,5 @@
 import type { DashboardSnapshot } from '@/types/admin';
-import type { CheckInResult, GateProgress } from '@/types/booking';
+import type { CheckInResult, GateProgress, ZoneBooking } from '@/types/booking';
 import type { BookingState } from '@/utils/booking-form';
 
 export type ConnectionState = { failuresBySource: Record<string, number>; isSignedOut: boolean };
@@ -107,6 +107,17 @@ export function recordCheckInFailure(state: ScannerState, error: string): Scanne
         error,
         isChecking: false,
     };
+}
+
+export function admitBooking(booking: BookingState, confirmation: ZoneBooking): BookingState {
+    const ownBooking = { zone: confirmation.zone, seatCount: confirmation.seatCount };
+    const zones = booking.zones.map((zone) =>
+        zone.name === ownBooking.zone
+            ? { ...zone, booked: Math.min(zone.capacity, zone.booked + ownBooking.seatCount) }
+            : zone,
+    );
+
+    return { zones, ownBooking };
 }
 
 export function admitGuests(progress: GateProgress, guestCount: number): GateProgress {
