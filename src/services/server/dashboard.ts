@@ -2,12 +2,14 @@ import 'server-only';
 import { Types } from 'mongoose';
 import { connectDb } from '@/lib/db';
 import { AuditLogModel, BookingModel, StudentModel, UserModel } from '@/models';
-import type { DashboardSnapshot, DashboardStats, GateEvent, SeatState } from '@/types/admin';
+import type { DashboardSnapshot, DashboardStats, GateEvent } from '@/types/admin';
+import type { ZoneName, ZoneOccupancy } from '@/types/booking';
 import { countGuests } from './checkIns';
 import { getEventSettings } from './settings';
 
 type CheckerNameDocument = { _id: unknown; name: string };
 type BookingSummaryDocument = { _id: unknown; studentName: string; seatCount: number };
+type ZoneTotalsDocument = { _id: ZoneName; booked: number; checkedIn: number };
 
 const GATE_EVENT_LIMIT = 20;
 const CHECKER_ACTOR_PREFIX = 'checker:';
@@ -71,6 +73,34 @@ async function listGateEvents(): Promise<GateEvent[]> {
     });
 }
 
+export async function getZoneOccupancy(): Promise<ZoneOccupancy[]> {
+    await connectDb();
+
+    const [settings, totals] = await Promise.all([
+        getEventSettings(),
+        BookingModel.aggregate<ZoneTotalsDocument>([
+            {
+                $group: {
+                    _id: '$zone',
+                    booked: { $sum: '$seatCount' },
+                    checkedIn: {
+                        $sum: { $cond: [{ $eq: ['$status', 'checkedIn'] }, '$seatCount', 0] },
+                    },
+                },
+            },
+        ]),
+    ]);
+
+    const totalsByZone = new Map(totals.map((total) => [total._id, total]));
+
+    return settings.zones.map((zone) => ({
+        name: zone.name,
+        capacity: zone.capacity,
+        booked: totalsByZone.get(zone.name)?.booked ?? 0,
+        checkedIn: totalsByZone.get(zone.name)?.checkedIn ?? 0,
+    }));
+}
+
 export async function getStats(): Promise<DashboardStats> {
     await connectDb();
 
@@ -98,7 +128,7 @@ export async function getStats(): Promise<DashboardStats> {
 
     return {
         totalSeats: settings.totalSeats,
-        seatsRemaining: settings.totalSeats - settings.nextSeatIndex,
+        seatsRemaining: settings.totalSeats - settings.allocatedSeats,
         bookings,
         guests: guestTotals.guests,
         checkedInBookings,
@@ -114,20 +144,12 @@ export async function getStats(): Promise<DashboardStats> {
 export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     await connectDb();
 
-    const [settings, stats, bookings, gateEvents] = await Promise.all([
+    const [settings, stats, zones, gateEvents] = await Promise.all([
         getEventSettings(),
         getStats(),
-        BookingModel.find({}, { seats: 1, status: 1 }, { lean: true }),
+        getZoneOccupancy(),
         listGateEvents(),
     ]);
-
-    const seats: Record<string, SeatState> = {};
-
-    for (const booking of bookings) {
-        for (const seat of booking.seats) {
-            seats[seat] = booking.status === 'checkedIn' ? 'checkedIn' : 'booked';
-        }
-    }
 
     return {
         event: {
@@ -135,11 +157,9 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
             eventDate: settings.eventDate.toISOString(),
             gatesOpenAt: settings.gatesOpenAt.toISOString(),
             venue: settings.venue,
-            rows: settings.rows,
-            seatsPerRow: settings.seatsPerRow,
         },
         stats,
-        seats,
+        zones,
         gateEvents,
     };
 }

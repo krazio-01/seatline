@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import { z } from 'zod';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { ADMIN_SIGN_IN_HREF } from '@/components/layout/navigation';
+import { ADMIN_SIGN_IN_HREF, SCANNER_SIGN_IN_HREF } from '@/components/layout/navigation';
 import { getEnv } from '@/lib/env';
 import { connectDb } from '@/lib/db';
 import { InvalidCredentialsError, UnauthorizedError } from '@/lib/errors';
@@ -117,6 +117,13 @@ export async function requireAdminMutation(request: Request) {
 export async function requireCheckerSession() {
     const session = await getCheckerSession();
     if (!session) throw new UnauthorizedError();
+
+    return session;
+}
+
+export async function requireCheckerPage() {
+    const session = await getCheckerSession();
+    if (!session) redirect(SCANNER_SIGN_IN_HREF);
 
     return session;
 }

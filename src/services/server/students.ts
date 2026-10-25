@@ -15,7 +15,7 @@ import {
 import { escapeRegex } from '@/utils/text';
 import type { StudentOption } from '@/types/booking';
 
-type AvailableStudentRow = Pick<StudentDocument, 'name' | 'group' | 'idNumber'> & {
+type AvailableStudentRow = Pick<StudentDocument, 'name' | 'group'> & {
     _id: Types.ObjectId;
 };
 
@@ -50,7 +50,7 @@ function canonicalHeader(header: string): string {
 export async function listAvailableStudents(): Promise<StudentOption[]> {
     await connectDb();
 
-    const students = await StudentModel.find({ hasBooked: false }, 'name group idNumber', {
+    const students = await StudentModel.find({ hasBooked: false }, 'name group', {
         sort: STUDENT_SORT,
         collation: STUDENT_COLLATION,
     }).lean<AvailableStudentRow[]>();
@@ -59,7 +59,6 @@ export async function listAvailableStudents(): Promise<StudentOption[]> {
         id: String(student._id),
         name: student.name,
         group: student.group,
-        idNumber: student.idNumber,
     }));
 }
 

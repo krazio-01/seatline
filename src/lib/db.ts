@@ -11,6 +11,7 @@ const CONNECTION_OPTIONS = {
 };
 
 const DEFAULT_PAGING: PagingLimits = { defaultPageSize: 25, maxPageSize: 100, maxPage: 10000 };
+const globalForMongoose = globalThis as { mongooseConnection?: Promise<typeof mongoose> };
 
 const queryNumber = z.coerce.number().int();
 
@@ -18,8 +19,6 @@ export const pagingQueryFields = {
     page: queryNumber.min(1).optional(),
     pageSize: queryNumber.min(1).max(DEFAULT_PAGING.maxPageSize).optional(),
 };
-
-const globalForMongoose = globalThis as { mongooseConnection?: Promise<typeof mongoose> };
 
 export async function connectDb(uri = getEnv().MONGODB_URI): Promise<typeof mongoose> {
     globalForMongoose.mongooseConnection ??= mongoose.connect(uri, CONNECTION_OPTIONS);

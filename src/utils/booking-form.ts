@@ -1,8 +1,20 @@
-import { seatIndexFromLabel } from '@/utils/seats';
+import type { ZoneBooking, ZoneOccupancy } from '@/types/booking';
 
 export type BookingStep = 'details' | 'verify' | 'pass';
 
 export type BookingStepEvent = 'detailsValid' | 'codeConfirmed' | 'editDetails';
+
+export type GuestValues = {
+    name: string;
+    aadhaar: string;
+    phone: string;
+    email: string;
+    photoId: string;
+};
+
+export type BookingDetailsValues = { studentId: string; guests: GuestValues[] };
+
+export type BookingState = { zones: ZoneOccupancy[]; ownBooking: ZoneBooking | null };
 
 export const BOOKING_STEPS: { value: BookingStep; label: string }[] = [
     { value: 'details', label: 'Details' },
@@ -16,28 +28,14 @@ const TRANSITIONS: Record<BookingStep, Partial<Record<BookingStepEvent, BookingS
     pass: {},
 };
 
+export const EMPTY_GUEST: GuestValues = {
+    name: '',
+    aadhaar: '',
+    phone: '',
+    email: '',
+    photoId: '',
+};
+
 export function nextStep(step: BookingStep, event: BookingStepEvent): BookingStep {
     return TRANSITIONS[step][event] ?? step;
-}
-
-export type GuestValues = { name: string; aadhaar: string; phone: string; email: string };
-
-export type BookingDetailsValues = { studentId: string; guests: GuestValues[] };
-
-export const EMPTY_GUEST: GuestValues = { name: '', aadhaar: '', phone: '', email: '' };
-
-export function formatStudentGroupAndId(student: { group: string; idNumber: string }): string {
-    return `Group ${student.group} · ${student.idNumber}`;
-}
-
-export type BookingState = { nextSeatIndex: number; seatsPerRow: number; ownSeats?: string[] };
-
-export function bookedSeatCount({ nextSeatIndex, seatsPerRow, ownSeats }: BookingState): number {
-    if (!ownSeats?.length) return nextSeatIndex;
-
-    const lastAllocatedIndex = Math.max(
-        ...ownSeats.map((seat) => seatIndexFromLabel(seat, seatsPerRow)),
-    );
-
-    return Math.max(nextSeatIndex + ownSeats.length, lastAllocatedIndex + 1);
 }

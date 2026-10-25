@@ -2,9 +2,17 @@ import 'server-only';
 import { getEnv } from '@/lib/env';
 import { createNoopBotCheck, createTurnstileBotCheck, type BotCheck } from './bot-check';
 import { createSmtpEmailSender, type EmailSender } from './email';
+import {
+    createTesseractRecognizer,
+    limitRecognizer,
+    type TextRecognizer,
+} from './text-recognition';
 
 let emailSender: EmailSender | undefined;
 let botCheck: BotCheck | undefined;
+let textRecognizer: TextRecognizer | undefined;
+
+const OCR_LIMITS = { maxPending: 6, timeoutMs: 25_000 };
 
 export function getEmailSender(): EmailSender {
     const env = getEnv();
@@ -26,4 +34,10 @@ export function getBotCheck(): BotCheck {
         : createNoopBotCheck();
 
     return botCheck;
+}
+
+export function getTextRecognizer(): TextRecognizer {
+    textRecognizer ??= limitRecognizer(createTesseractRecognizer(), OCR_LIMITS);
+
+    return textRecognizer;
 }

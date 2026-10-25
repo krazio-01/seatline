@@ -18,7 +18,7 @@ import { EMAIL_PROOF_SECONDS, signEmailProof, verifyEmailProof } from '@/lib/sec
 import { BookingModel, EmailVerificationModel } from '@/models';
 import type { EmailSender } from '@/providers/email';
 import { renderConfirmationEmail, renderVerificationEmail } from '@/templates/emails';
-import type { EmailDelivery, EmailStatus } from '@/types/booking';
+import type { EmailDelivery, EmailStatus, ZoneName } from '@/types/booking';
 import { getEventSettings } from './settings';
 
 export type SendOptions = { now?: Date; dailyLimit?: number };
@@ -43,7 +43,8 @@ async function attemptDelivery(
     booking: {
         _id: unknown;
         studentName: string;
-        seats: string[];
+        zone: ZoneName;
+        seatCount: number;
         qrToken: string;
         guests: { name: string; email: string }[];
     },
@@ -70,7 +71,8 @@ async function attemptDelivery(
                 venue: settings.venue,
                 studentName: booking.studentName,
                 guestNames: booking.guests.map((guest) => guest.name),
-                seats: booking.seats,
+                zone: booking.zone,
+                seatCount: booking.seatCount,
                 qrContentId: QR_CONTENT_ID,
             });
 
