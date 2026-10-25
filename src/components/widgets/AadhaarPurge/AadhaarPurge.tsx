@@ -27,7 +27,7 @@ export function AadhaarPurge() {
         const { bookingsUpdated } = await api.aadhaar.purge();
 
         toast({
-            title: 'Aadhaar numbers removed',
+            title: 'Aadhaar data removed',
             description: `${bookingsUpdated} ${pluralize(bookingsUpdated, 'booking')} updated.`,
             tone: 'success',
         });
@@ -36,9 +36,9 @@ export function AadhaarPurge() {
     const openConfirm = () => {
         setHasOpened(true);
         setRequest({
-            title: 'Remove all Aadhaar numbers?',
+            title: 'Remove all Aadhaar data?',
             description:
-                'Every stored Aadhaar number is deleted from all bookings, including the masked digits. Reveals stop working. This cannot be undone.',
+                'Removes every Aadhaar number and card photo. Masked digits and gate photos go too, and reveals stop working. This cannot be undone.',
             confirmLabel: 'Remove all',
             tone: 'destructive',
             confirmPhrase: CONFIRM_PHRASE,
@@ -49,15 +49,15 @@ export function AadhaarPurge() {
     return (
         <div className="aadhaar-purge">
             <div>
-                <h3 className="aadhaar-purge-title">Stored Aadhaar numbers</h3>
+                <h3 className="aadhaar-purge-title">Stored Aadhaar data</h3>
                 <p className="aadhaar-purge-description">
-                    Delete every stored Aadhaar number once the event is over. Each removal is
-                    recorded in the audit log.
+                    Removes every Aadhaar number and card photo. Do this once the event is over.
+                    Each removal is recorded in the audit log.
                 </p>
             </div>
 
             <Button variant="destructive" onClick={openConfirm}>
-                Remove Aadhaar numbers
+                Remove Aadhaar data
             </Button>
 
             {hasOpened && <ConfirmDialog request={request} onClose={() => setRequest(null)} />}

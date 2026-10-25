@@ -2,6 +2,8 @@
 @use 'mixins' as *;
 
 .login-form {
+    --login-form-field-gap: 14px;
+
     display: grid;
     width: 380px;
     max-width: 100%;
@@ -75,7 +77,7 @@
         .login-form-fields {
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: var(--login-form-field-gap);
 
             .form-field {
                 grid-template-columns: 1fr auto;
@@ -132,26 +134,57 @@
             }
 
             .login-form-caps-lock {
-                min-height: 16px;
-                margin-top: -8px;
+                display: grid;
+                grid-template-rows: 0fr;
+                margin-top: calc(-1 * var(--login-form-field-gap));
                 color: $color-warning;
                 font-size: 0.75rem;
                 line-height: 16px;
                 opacity: 0;
-                transition: opacity $duration-base $ease-out;
+                transition:
+                    grid-template-rows $duration-fast $ease-out,
+                    margin-top $duration-fast $ease-out,
+                    opacity $duration-fast $ease-out;
+
+                .login-form-caps-lock-text {
+                    overflow: hidden;
+                }
+
+                @include reduced-motion {
+                    transition: none;
+                }
 
                 &[data-visible] {
+                    grid-template-rows: 1fr;
+                    margin-top: calc(6px - var(--login-form-field-gap));
                     opacity: 1;
                 }
             }
         }
 
         .login-form-error {
-            min-height: 18px;
-            margin: 16px 0 10px;
+            display: grid;
+            grid-template-rows: 0fr;
+            margin: var(--login-form-field-gap) 0 0;
             color: $color-destructive-text;
             font-size: 0.8125rem;
             line-height: 18px;
+            transition:
+                grid-template-rows $duration-fast $ease-out,
+                margin $duration-fast $ease-out;
+
+            .login-form-error-text {
+                overflow: hidden;
+            }
+
+            @include reduced-motion {
+                transition: none;
+            }
+
+            &[data-visible] {
+                grid-template-rows: 1fr;
+                margin: 16px 0 10px;
+            }
         }
 
         .login-form-submit {
@@ -224,6 +257,8 @@
     }
 
     @media (min-width: $breakpoint-lg) {
+        --login-form-field-gap: 20px;
+
         width: 480px;
 
         .login-form-card {
@@ -261,8 +296,6 @@
             }
 
             .login-form-fields {
-                gap: 20px;
-
                 .form-field {
                     gap: 9px 8px;
 
@@ -290,10 +323,6 @@
                             }
                         }
                     }
-                }
-
-                .login-form-caps-lock {
-                    margin-top: -14px;
                 }
             }
 

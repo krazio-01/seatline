@@ -28,11 +28,28 @@ import { useToast } from '@/components/ui/Toast/Toast';
 import { EMAIL_STATUS_LABELS, EmailStatus } from '@/components/widgets/EmailStatus/EmailStatus';
 import { useLivePolling } from '@/context/liveSlices';
 import { useUrlQuery, useUrlSearch } from '@/hooks/useUrlQuery';
-import type { EmailStatus as EmailStatusValue } from '@/types/booking';
+import {
+    EVENT_ZONES,
+    ZONE_LABELS,
+    type EmailStatus as EmailStatusValue,
+    type ZoneName,
+} from '@/types/booking';
 import { api } from '@/services/client/api';
 import type { BookingPage, BookingRow } from '@/types/admin';
 import { formatDate } from '@/utils/dates';
 import { DURATION, EASE_OUT } from '@/utils/motion';
+
+type BookingStatus = BookingRow['status'];
+
+type BookingQuery = {
+    search?: string;
+    status?: BookingStatus;
+    emailStatus?: EmailStatusValue;
+    zone?: ZoneName;
+    page?: number;
+};
+
+type LoadedPage = { queryKey: string; page: BookingPage };
 
 const AadhaarReveal = dynamic(
     () =>
@@ -41,17 +58,6 @@ const AadhaarReveal = dynamic(
         ),
     { ssr: false },
 );
-
-type BookingStatus = BookingRow['status'];
-
-type BookingQuery = {
-    search?: string;
-    status?: BookingStatus;
-    emailStatus?: EmailStatusValue;
-    page?: number;
-};
-
-type LoadedPage = { queryKey: string; page: BookingPage };
 
 const POLL_INTERVAL_MS = 5000;
 const SKELETON_ROW_COUNT = 5;
@@ -65,6 +71,11 @@ const STATUS_OPTIONS: FilterOption<BookingStatus>[] = [
 const EMAIL_OPTIONS: FilterOption<EmailStatusValue>[] = (
     ['sent', 'pending', 'failed'] as const
 ).map((value) => ({ value, label: EMAIL_STATUS_LABELS[value] }));
+
+const ZONE_OPTIONS: FilterOption<ZoneName>[] = EVENT_ZONES.map((zone) => ({
+    value: zone,
+    label: ZONE_LABELS[zone],
+}));
 
 function pickOption<Value extends string>(
     options: FilterOption<Value>[],
@@ -80,6 +91,7 @@ function readQuery(params: URLSearchParams): BookingQuery {
         search: params.get('search')?.trim() || undefined,
         status: pickOption(STATUS_OPTIONS, params.get('status')),
         emailStatus: pickOption(EMAIL_OPTIONS, params.get('emailStatus')),
+        zone: pickOption(ZONE_OPTIONS, params.get('zone')),
         page: Number.isInteger(page) && page > 1 ? page : undefined,
     };
 }
@@ -206,6 +218,7 @@ export function BookingsTable({ pageSize }: { pageSize: number }) {
     const openReveal = (row: BookingRow) => {
         setHasOpenedReveal(true);
         setRevealTarget({
+            bookingId: row.id,
             studentName: row.studentName,
             guestCount: row.guests.length,
             result: api.bookings.revealAadhaar(row.id).then(
@@ -219,7 +232,12 @@ export function BookingsTable({ pageSize }: { pageSize: number }) {
 
     const clearFilters = () => {
         clearSearch();
-        updateQuery({ search: undefined, status: undefined, emailStatus: undefined });
+        updateQuery({
+            search: undefined,
+            status: undefined,
+            emailStatus: undefined,
+            zone: undefined,
+        });
     };
 
     const pageNumber = query.page ?? 1;
@@ -227,7 +245,7 @@ export function BookingsTable({ pageSize }: { pageSize: number }) {
     const isPastLastPage = Boolean(
         currentPage && currentPage.items.length === 0 && currentPage.total > 0,
     );
-    const hasFilters = Boolean(query.search || query.status || query.emailStatus);
+    const hasFilters = Boolean(query.search || query.status || query.emailStatus || query.zone);
 
     return (
         <div className="bookings-table">
@@ -252,6 +270,13 @@ export function BookingsTable({ pageSize }: { pageSize: number }) {
                     value={query.emailStatus}
                     onValueChange={(emailStatus) => updateQuery({ emailStatus })}
                 />
+
+                <FilterMenu
+                    label="Zone"
+                    options={ZONE_OPTIONS}
+                    value={query.zone}
+                    onValueChange={(zone) => updateQuery({ zone })}
+                />
             </TableToolbar>
 
             <Table aria-busy={!shownPage || isStale} data-stale={isStale || undefined}>
@@ -260,7 +285,7 @@ export function BookingsTable({ pageSize }: { pageSize: number }) {
                         <TableHead>Student</TableHead>
                         <TableHead>Group</TableHead>
                         <TableHead>Guests</TableHead>
-                        <TableHead>Seats</TableHead>
+                        <TableHead>Zone</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Check-in</TableHead>
                         <TableHead>Aadhaar</TableHead>
@@ -327,12 +352,8 @@ export function BookingsTable({ pageSize }: { pageSize: number }) {
                                 </TableCell>
                                 <TableCell>{row.guests.length}</TableCell>
                                 <TableCell>
-                                    <span className="bookings-table-seats">
-                                        {row.seats.map((seat) => (
-                                            <span key={seat} className="bookings-table-seat">
-                                                {seat}
-                                            </span>
-                                        ))}
+                                    <span className="bookings-table-zone" data-zone={row.zone}>
+                                        {ZONE_LABELS[row.zone]}
                                     </span>
                                 </TableCell>
                                 <TableCell>
@@ -421,7 +442,7 @@ export function BookingsTable({ pageSize }: { pageSize: number }) {
                                 ) : (
                                     <EmptyState
                                         title="No bookings yet"
-                                        description="When guests register on the booking page, their seats and passes appear here."
+                                        description="When guests register on the booking page, their zones and passes appear here."
                                         preview={{
                                             name: 'bookings',
                                             status: '0 total',

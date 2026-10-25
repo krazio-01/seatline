@@ -6,7 +6,15 @@ import { useToast } from '@/components/ui/Toast/Toast';
 import { api } from '@/services/client/api';
 import type { SessionRole } from '@/types/admin';
 
-export function SignOutButton({ role, redirectTo }: { role: SessionRole; redirectTo: string }) {
+export function SignOutButton({
+    role,
+    redirectTo,
+    display = 'labelled',
+}: {
+    role: SessionRole;
+    redirectTo: string;
+    display?: 'labelled' | 'icon';
+}) {
     const { toast } = useToast();
     const [isSigningOut, setIsSigningOut] = useState(false);
 
@@ -25,6 +33,20 @@ export function SignOutButton({ role, redirectTo }: { role: SessionRole; redirec
             });
         }
     };
+
+    if (display === 'icon') {
+        return (
+            <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Sign out"
+                loading={isSigningOut}
+                onClick={signOut}
+            >
+                <LogOutIcon />
+            </Button>
+        );
+    }
 
     return (
         <Button variant="outline" size="sm" loading={isSigningOut} onClick={signOut}>

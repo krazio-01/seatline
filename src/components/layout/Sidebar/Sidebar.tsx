@@ -1,14 +1,11 @@
 'use client';
-import { useId, useState } from 'react';
+import { useId } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { m, useReducedMotion } from 'motion/react';
-import { LogOutIcon } from 'lucide-react';
 import './sidebar.scss';
-import { Button } from '@/components/ui/Button/Button';
-import { useToast } from '@/components/ui/Toast/Toast';
+import { SignOutButton } from '@/components/layout/Header/SignOutButton';
 import { useAppContext } from '@/context/appContext';
-import { api } from '@/services/client/api';
 import { DURATION, EASE_OUT } from '@/utils/motion';
 import {
     ADMIN_NAVIGATION,
@@ -20,27 +17,9 @@ import { initials } from '@/utils/text';
 
 export function Sidebar({ subtitle, userName }: { subtitle: string; userName: string }) {
     const pathname = usePathname();
-    const { toast } = useToast();
     const prefersReducedMotion = useReducedMotion();
     const highlightId = useId();
     const { event, stats } = useAppContext('dashboard');
-    const [isSigningOut, setIsSigningOut] = useState(false);
-
-    const signOut = async () => {
-        setIsSigningOut(true);
-
-        try {
-            await api.sessions.delete('admin');
-            window.location.replace(ADMIN_SIGN_IN_HREF);
-        } catch (error) {
-            setIsSigningOut(false);
-            toast({
-                title: 'Sign out failed',
-                description: (error as Error).message,
-                tone: 'error',
-            });
-        }
-    };
 
     return (
         <aside className="sidebar">
@@ -109,15 +88,7 @@ export function Sidebar({ subtitle, userName }: { subtitle: string; userName: st
                     {userName}
                     <small className="sidebar-user-role">Admin</small>
                 </span>
-                <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Sign out"
-                    loading={isSigningOut}
-                    onClick={signOut}
-                >
-                    <LogOutIcon />
-                </Button>
+                <SignOutButton role="admin" redirectTo={ADMIN_SIGN_IN_HREF} display="icon" />
             </div>
         </aside>
     );
