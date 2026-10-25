@@ -1,23 +1,19 @@
 import type { Metadata } from 'next';
+import { CalendarX2Icon } from 'lucide-react';
 import './page.scss';
-import { LoginForm } from '@/components/forms/LoginForm/LoginForm';
 import { Header } from '@/components/layout/Header/Header';
 import { SignOutButton } from '@/components/layout/Header/SignOutButton';
-import { SCANNER_HREF } from '@/components/layout/navigation';
+import { SCANNER_SIGN_IN_HREF } from '@/components/layout/navigation';
 import { Camera } from '@/components/media/Camera/Camera';
-import { DotTerrain } from '@/components/scenes/DotTerrain/DotTerrain';
-import { MotionProvider } from '@/components/ui/Animations/ClientAnimations';
-import { Reveal } from '@/components/ui/Animations/Animations';
 import { ToastProvider } from '@/components/ui/Toast/Toast';
 import { GateProgress } from '@/components/widgets/GateProgress/GateProgress';
+import { Notice } from '@/components/widgets/Notice/Notice';
 import { ScanResult, ScanTally } from '@/components/widgets/ScanResult/ScanResult';
 import { AppProvider } from '@/context/appContext';
-import { INITIAL_SCANNER, INITIAL_SIGN_IN } from '@/context/appStore';
+import { INITIAL_SCANNER } from '@/context/appStore';
 import { LiveSlices } from '@/context/liveSlices';
-import { CHECKER_SESSION_SECONDS } from '@/lib/security/tokens';
-import { getCheckerSession } from '@/services/server/auth';
-import { getGateProgress } from '@/services/server/checkIns';
-import { findEventSettings } from '@/services/server/settings';
+import { requireCheckerPage } from '@/services/server/auth';
+import { findGateProgress } from '@/services/server/checkIns';
 import { initials } from '@/utils/text';
 
 export const metadata: Metadata = { title: 'Scanner' };
@@ -25,57 +21,59 @@ export const metadata: Metadata = { title: 'Scanner' };
 const GATE_PROGRESS_POLL_MS = 15000;
 
 export default async function Page() {
-    const session = await getCheckerSession();
+    const session = await requireCheckerPage();
 
-    if (!session) {
-        const settings = await findEventSettings();
+    const gateProgress = await findGateProgress();
 
+    const header = (
+        <Header
+            className="scanner-header"
+            start={
+                <div className="scanner-checker">
+                    <span className="scanner-checker-avatar" aria-hidden="true">
+                        {initials(session.name)}
+                    </span>
+                    <p className="scanner-checker-name">
+                        {session.name}
+                        <small className="scanner-checker-role">Checker</small>
+                    </p>
+                </div>
+            }
+            end={<SignOutButton role="checker" redirectTo={SCANNER_SIGN_IN_HREF} />}
+        />
+    );
+
+    if (!gateProgress) {
         return (
-            <AppProvider initialState={{ signIn: INITIAL_SIGN_IN }}>
-                <MotionProvider>
-                    <main>
-                        <DotTerrain isFullScreen>
-                            <Reveal>
-                                <LoginForm
-                                    role="checker"
-                                    redirectTo={SCANNER_HREF}
-                                    sessionSeconds={CHECKER_SESSION_SECONDS}
-                                    eventName={settings?.eventName}
-                                />
-                            </Reveal>
-                        </DotTerrain>
-                    </main>
-                </MotionProvider>
-            </AppProvider>
+            <ToastProvider>
+                <AppProvider initialState={{}} signInPath={SCANNER_SIGN_IN_HREF}>
+                    <div className="scanner">
+                        {header}
+
+                        <main className="scanner-unavailable">
+                            <h1 className="visually-hidden">Scan guest passes</h1>
+                            <Notice
+                                icon={CalendarX2Icon}
+                                title="The event is not set up yet"
+                                description="Ask an admin to finish Settings, then reload this page."
+                            />
+                        </main>
+                    </div>
+                </AppProvider>
+            </ToastProvider>
         );
     }
-
-    const gateProgress = await getGateProgress();
 
     return (
         <ToastProvider>
             <AppProvider
                 initialState={{ scanner: INITIAL_SCANNER, gateProgress }}
-                signInPath={SCANNER_HREF}
+                signInPath={SCANNER_SIGN_IN_HREF}
             >
                 <LiveSlices slices={{ gateProgress: GATE_PROGRESS_POLL_MS }} />
 
                 <div className="scanner">
-                    <Header
-                        className="scanner-header"
-                        start={
-                            <div className="scanner-checker">
-                                <span className="scanner-checker-avatar" aria-hidden="true">
-                                    {initials(session.name)}
-                                </span>
-                                <p className="scanner-checker-name">
-                                    {session.name}
-                                    <small className="scanner-checker-role">Checker</small>
-                                </p>
-                            </div>
-                        }
-                        end={<SignOutButton role="checker" redirectTo={SCANNER_HREF} />}
-                    />
+                    {header}
 
                     <main className="scanner-main">
                         <h1 className="visually-hidden">Scan guest passes</h1>

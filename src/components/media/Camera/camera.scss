@@ -229,7 +229,7 @@
             }
 
             &[data-hud-state='checking'] .camera-hud-frame .camera-hud-frame-line {
-                animation: camera-hud-pulse 1.2s ease-in-out infinite;
+                animation: camera-hud-pulse $duration-pulse ease-in-out infinite;
             }
 
             &[data-hud-state='ok'] {
@@ -250,7 +250,7 @@
             &[data-hud-state='bad'],
             &[data-hud-state='error'] {
                 .camera-hud-frame {
-                    height: 50%;
+                    scale: calc(50 / 58);
                     animation: camera-hud-lock $duration-slow $ease-out;
                 }
 
@@ -331,6 +331,20 @@
         .camera-controls-button {
             width: 100%;
         }
+
+        .camera-controls-notice {
+            display: inline-flex;
+            grid-column: 1 / -1;
+            align-items: center;
+            gap: 6px;
+            color: $color-muted-foreground;
+            font-size: 0.8125rem;
+
+            svg {
+                width: 14px;
+                height: 14px;
+            }
+        }
     }
 
     &[data-camera-state='blocked'],
@@ -349,6 +363,6 @@
 
 @keyframes camera-hud-lock {
     from {
-        height: 58%;
+        scale: 1;
     }
 }

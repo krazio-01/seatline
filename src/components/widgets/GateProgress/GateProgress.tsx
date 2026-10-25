@@ -82,26 +82,32 @@ export function GateProgress() {
                 <p className="gate-progress-percent">{percent}%</p>
             </div>
 
-            <div
-                className="gate-progress-runway"
-                role="progressbar"
-                aria-label="Guests through the gate"
-                aria-valuemin={0}
-                aria-valuemax={guestsExpected}
-                aria-valuenow={guestsIn}
-                style={progressStyle}
-            >
-                <span className="gate-progress-runway-covered" />
-                <PlaneIcon className="gate-progress-plane" aria-hidden="true" />
-            </div>
+            {guestsExpected > 0 ? (
+                <>
+                    <div
+                        className="gate-progress-runway"
+                        role="progressbar"
+                        aria-label="Guests through the gate"
+                        aria-valuemin={0}
+                        aria-valuemax={guestsExpected}
+                        aria-valuenow={guestsIn}
+                        style={progressStyle}
+                    >
+                        <span className="gate-progress-runway-covered" />
+                        <PlaneIcon className="gate-progress-plane" aria-hidden="true" />
+                    </div>
 
-            <div className="gate-progress-marks" aria-hidden="true">
-                {RUNWAY_MARKS.map((mark) => (
-                    <span key={mark} className="gate-progress-mark">
-                        {mark * 100}%
-                    </span>
-                ))}
-            </div>
+                    <div className="gate-progress-marks" aria-hidden="true">
+                        {RUNWAY_MARKS.map((mark) => (
+                            <span key={mark} className="gate-progress-mark">
+                                {mark * 100}%
+                            </span>
+                        ))}
+                    </div>
+                </>
+            ) : (
+                <p className="gate-progress-empty">No bookings yet</p>
+            )}
 
             <p className="gate-progress-event">
                 Event starts {formatDate(new Date(eventStartsAt), 'time')}

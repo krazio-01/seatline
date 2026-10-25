@@ -1,0 +1,10 @@
+@use 'tokens' as *;
+
+.card-photo-dialog {
+    .card-photo-dialog-image {
+        width: 100%;
+        height: auto;
+        border-radius: $radius-md;
+        background: $color-muted;
+    }
+}
