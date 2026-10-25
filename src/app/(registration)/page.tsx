@@ -11,7 +11,7 @@ import { Hero } from '@/components/layout/Hero/Hero';
 import { SeatMap } from '@/components/scenes/SeatMap/SeatMap';
 import { LazyFlypast } from '@/components/scenes/LazyScenes';
 import { getEnv } from '@/lib/env';
-import { getEventSettings } from '@/services/server/settings';
+import { getEventSettings, pickZone } from '@/services/server/settings';
 import { formatDate } from '@/utils/dates';
 
 const SETTINGS_CACHE_SECONDS = 15;
@@ -39,12 +39,9 @@ const readRegistrationSettings = unstable_cache(
             eventYear: formatDate(settings.eventDate, 'year'),
             gatesOpenTime: formatDate(settings.gatesOpenAt, 'time'),
             venue: settings.venue,
-            rows: settings.rows,
-            seatsPerRow: settings.seatsPerRow,
+            zones: settings.zones,
             maxGuestsPerBooking: settings.maxGuestsPerBooking,
             bookingsOpen: settings.bookingsOpen,
-            nextSeatIndex: settings.nextSeatIndex,
-            totalSeats: settings.totalSeats,
         };
     },
     ['registration-settings'],
@@ -57,18 +54,21 @@ export default async function Page() {
     const settings = await readRegistrationSettings();
     const { TURNSTILE_SITE_KEY: turnstileSiteKey } = getEnv();
 
-    const isSoldOut = settings.nextSeatIndex >= settings.totalSeats;
+    const isSoldOut = pickZone(settings.zones, 1) === null;
     const isRegistrationOpen = settings.bookingsOpen && !isSoldOut;
 
+    const booking = {
+        zones: settings.zones.map(({ name, capacity, allocated }) => ({
+            name,
+            capacity,
+            booked: allocated,
+            checkedIn: 0,
+        })),
+        ownBooking: null,
+    };
+
     return (
-        <AppProvider
-            initialState={{
-                booking: {
-                    nextSeatIndex: settings.nextSeatIndex,
-                    seatsPerRow: settings.seatsPerRow,
-                },
-            }}
-        >
+        <AppProvider initialState={{ booking }}>
             <div className="registration-sky" aria-hidden="true">
                 <LazyFlypast />
             </div>
@@ -87,16 +87,11 @@ export default async function Page() {
                             { label: 'Gates open', value: settings.gatesOpenTime },
                             {
                                 label: 'Seats left',
-                                value: <SeatsLeft totalSeats={settings.totalSeats} />,
+                                value: <SeatsLeft />,
                             },
                         ]}
                     />
-                    <SeatMap
-                        rows={settings.rows}
-                        seatsPerRow={settings.seatsPerRow}
-                        venue={settings.venue}
-                        eventName={settings.eventName}
-                    />
+                    <SeatMap venue={settings.venue} eventName={settings.eventName} />
                 </section>
 
                 <div className="registration-aside">

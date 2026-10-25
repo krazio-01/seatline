@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
     title: 'Event Registration',
-    description: 'Register for the event and receive your seats and QR code by email.',
+    description: 'Register for the event and receive your zone and QR code by email.',
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {

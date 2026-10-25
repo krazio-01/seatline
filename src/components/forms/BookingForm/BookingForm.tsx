@@ -12,7 +12,8 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/Card/Card';
-import { useUpdateAppContext } from '@/context/appContext';
+import { useAppContext, useUpdateAppContext } from '@/context/appContext';
+import { admitBooking } from '@/context/appStore';
 import {
     BOOKING_STEPS,
     EMPTY_GUEST,
@@ -55,6 +56,7 @@ export function BookingForm({
     turnstileSiteKey?: string;
 }) {
     const updateAppContext = useUpdateAppContext();
+    const booking = useAppContext('booking');
 
     const [step, setStep] = useState<BookingStep>('details');
     const [student, setStudent] = useState<StudentOption | null>(null);
@@ -77,7 +79,7 @@ export function BookingForm({
         onBooked: (booked) => {
             setConfirmation(booked);
             dispatchStepEvent('codeConfirmed');
-            updateAppContext('booking', { ownSeats: booked.seats });
+            updateAppContext('booking', admitBooking(booking, booked));
         },
     });
 

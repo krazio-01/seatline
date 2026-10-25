@@ -5,21 +5,26 @@ import { PlusIcon, XIcon } from 'lucide-react';
 import {
     Controller,
     useFieldArray,
+    useWatch,
     type Control,
     type FieldErrors,
     type UseFormRegister,
+    type UseFormSetValue,
 } from 'react-hook-form';
+import { z } from 'zod/mini';
 import './guestFields.scss';
 import { Badge } from '@/components/ui/Badge/Badge';
 import { Button } from '@/components/ui/Button/Button';
 import { Input } from '@/components/ui/Input/Input';
 import { Label } from '@/components/ui/Label/Label';
 import { Separator } from '@/components/ui/Separator/Separator';
+import { AadhaarPhotoField } from '@/components/forms/AadhaarPhotoField/AadhaarPhotoField';
 import { FieldError } from '@/components/forms/FieldError/FieldError';
 import { EMPTY_GUEST, type BookingDetailsValues, type GuestValues } from '@/utils/booking-form';
 import {
     AADHAAR_GROUP_SIZE,
     AADHAAR_LENGTH,
+    guestInputSchema,
     PHONE_GROUP_SIZES,
     PHONE_LENGTH,
 } from '@/types/booking';
@@ -76,14 +81,53 @@ function formatDigitsInput(field: keyof GuestValues, value: string): string {
     return groupCharacters(digits, isAadhaar ? AADHAAR_GROUP_SIZE : PHONE_GROUP_SIZES);
 }
 
+function GuestPhoto({
+    control,
+    guestIndex,
+    errorMessage,
+}: {
+    control: Control<BookingDetailsValues>;
+    guestIndex: number;
+    errorMessage?: string;
+}) {
+    const [aadhaar, name] = useWatch({
+        control,
+        name: [`guests.${guestIndex}.aadhaar`, `guests.${guestIndex}.name`],
+    });
+
+    const isReady =
+        z.safeParse(guestInputSchema.shape.aadhaar, aadhaar).success &&
+        z.safeParse(guestInputSchema.shape.name, name).success;
+
+    return (
+        <Controller
+            control={control}
+            name={`guests.${guestIndex}.photoId`}
+            render={({ field }) => (
+                <AadhaarPhotoField
+                    key={`${aadhaar}|${name}`}
+                    aadhaar={aadhaar}
+                    name={name}
+                    isReady={isReady}
+                    photoId={field.value}
+                    errorMessage={errorMessage}
+                    onChange={field.onChange}
+                />
+            )}
+        />
+    );
+}
+
 export function GuestFields({
     control,
     register,
+    setValue,
     errors,
     maxGuestsPerBooking,
 }: {
     control: Control<BookingDetailsValues>;
     register: UseFormRegister<BookingDetailsValues>;
+    setValue: UseFormSetValue<BookingDetailsValues>;
     errors: FieldErrors<BookingDetailsValues>;
     maxGuestsPerBooking: number;
 }) {
@@ -164,19 +208,43 @@ export function GuestFields({
                                                                 name={field.name}
                                                                 value={field.value}
                                                                 onBlur={field.onBlur}
-                                                                onChange={(event) =>
-                                                                    field.onChange(
-                                                                        formatDigitsInput(
-                                                                            input.field,
-                                                                            event.target.value,
-                                                                        ),
-                                                                    )
-                                                                }
+                                                                onChange={(event) => {
+                                                                    const value = formatDigitsInput(
+                                                                        input.field,
+                                                                        event.target.value,
+                                                                    );
+
+                                                                    if (
+                                                                        input.field === 'aadhaar' &&
+                                                                        value !== field.value
+                                                                    ) {
+                                                                        setValue(
+                                                                            `guests.${guestIndex}.photoId`,
+                                                                            '',
+                                                                        );
+                                                                    }
+
+                                                                    field.onChange(value);
+                                                                }}
                                                             />
                                                         )}
                                                     />
                                                 ) : (
-                                                    <Input {...sharedProps} {...register(path)} />
+                                                    <Input
+                                                        {...sharedProps}
+                                                        {...register(
+                                                            path,
+                                                            input.field === 'name'
+                                                                ? {
+                                                                      onChange: () =>
+                                                                          setValue(
+                                                                              `guests.${guestIndex}.photoId`,
+                                                                              '',
+                                                                          ),
+                                                                  }
+                                                                : undefined,
+                                                        )}
+                                                    />
                                                 )}
 
                                                 <FieldError id={errorId} message={message} />
@@ -184,6 +252,12 @@ export function GuestFields({
                                         );
                                     })}
                                 </div>
+
+                                <GuestPhoto
+                                    control={control}
+                                    guestIndex={guestIndex}
+                                    errorMessage={guestErrors?.photoId?.message}
+                                />
                             </div>
                         </m.div>
                     );

@@ -89,6 +89,7 @@ export function DetailsStep({
     const {
         control,
         register,
+        setValue,
         handleSubmit,
         formState: { errors },
     } = form;
@@ -127,6 +128,7 @@ export function DetailsStep({
             <GuestFields
                 control={control}
                 register={register}
+                setValue={setValue}
                 errors={errors}
                 maxGuestsPerBooking={maxGuestsPerBooking}
             />

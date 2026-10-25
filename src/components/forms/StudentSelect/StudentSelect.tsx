@@ -7,7 +7,6 @@ import { Hotkey } from '@/components/ui/Hotkey/Hotkey';
 import type { StudentsState } from '@/components/dialogs/StudentPicker/StudentPicker';
 import { api } from '@/services/client/api';
 import type { StudentOption } from '@/types/booking';
-import { formatStudentGroupAndId } from '@/utils/booking-form';
 
 const StudentPicker = dynamic(
     () =>
@@ -98,9 +97,7 @@ export function StudentSelect({
                 {value ? (
                     <span className="student-select-value">
                         {value.name}
-                        <span className="student-select-meta">
-                            {formatStudentGroupAndId(value)}
-                        </span>
+                        <span className="student-select-meta">Group {value.group}</span>
                     </span>
                 ) : (
                     <span className="student-select-placeholder">Select the student…</span>
