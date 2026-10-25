@@ -28,7 +28,6 @@ const IGNORED_GAP_SECONDS = 0.25;
 const SOFT_SHADOWS = { enabled: true, type: PCFShadowMap };
 const DEPRECATED_CLOCK_WARNING = 'THREE.Clock: This module has been deprecated';
 const SLOW_STREAKS_BEFORE_LOW_POWER = 2;
-
 const SceneQualityContext = createContext({ isLowPower: false });
 
 setConsoleFunction((type, message, ...params) => {
@@ -36,10 +35,6 @@ setConsoleFunction((type, message, ...params) => {
 
     console[type](message, ...params);
 });
-
-export function useSceneQuality() {
-    return useContext(SceneQualityContext);
-}
 
 function FrameloopController({ isActive, isStill }: { isActive: boolean; isStill: boolean }) {
     const setFrameloop = useThree((state) => state.setFrameloop);
@@ -93,6 +88,10 @@ function SlowFrameMonitor({
     });
 
     return null;
+}
+
+export function useSceneQuality() {
+    return useContext(SceneQualityContext);
 }
 
 export function StudioEnvironment({ intensity = 1 }: { intensity?: number }) {

@@ -12,6 +12,19 @@ const FlypastScene = dynamic(
     { ssr: false },
 );
 
+export const LazyAuditorium = dynamic(
+    () => import('@/components/scenes/Auditorium/Auditorium').then((module) => module.Auditorium),
+    { ssr: false },
+);
+
+export const LazyDotTerrainScene = dynamic(
+    () =>
+        import('@/components/scenes/DotTerrain/DotTerrainScene').then(
+            (module) => module.DotTerrainScene,
+        ),
+    { ssr: false },
+);
+
 function whenIdle(callback: () => void): () => void {
     if ('requestIdleCallback' in window) {
         const handle = requestIdleCallback(callback, { timeout: IDLE_TIMEOUT_MS });
@@ -57,19 +70,6 @@ export function useSceneGate(nearViewportRef?: RefObject<HTMLElement | null>): b
 
     return shouldLoad;
 }
-
-export const LazyAuditorium = dynamic(
-    () => import('@/components/scenes/Auditorium/Auditorium').then((module) => module.Auditorium),
-    { ssr: false },
-);
-
-export const LazyDotTerrainScene = dynamic(
-    () =>
-        import('@/components/scenes/DotTerrain/DotTerrainScene').then(
-            (module) => module.DotTerrainScene,
-        ),
-    { ssr: false },
-);
 
 export function LazyFlypast() {
     const shouldLoad = useSceneGate();

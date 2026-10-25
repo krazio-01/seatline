@@ -9,8 +9,24 @@ const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 const CONSTRAINED_DEVICE_QUERY = '(pointer: coarse), (max-width: 700px)';
 const SOFTWARE_RENDERER = /swiftshader|llvmpipe|softpipe|software/i;
 const SERVER_WEBGL_SUPPORT: WebglSupport = { isSupported: false, isSoftware: false };
-
 let cachedWebglSupport: WebglSupport | null = null;
+
+function isSlowConnection(): boolean {
+    const connection = (navigator as Navigator & { connection?: NetworkInformationHints })
+        .connection;
+
+    return (
+        Boolean(connection?.saveData) || SLOW_EFFECTIVE_TYPES.has(connection?.effectiveType ?? '')
+    );
+}
+
+function subscribeToReducedMotion(onChange: () => void) {
+    const query = matchMedia(REDUCED_MOTION_QUERY);
+
+    query.addEventListener('change', onChange);
+
+    return () => query.removeEventListener('change', onChange);
+}
 
 export function readWebglSupport(): WebglSupport {
     if (cachedWebglSupport !== null) return cachedWebglSupport;
@@ -40,15 +56,6 @@ export function subscribeToNothing() {
     return () => undefined;
 }
 
-function isSlowConnection(): boolean {
-    const connection = (navigator as Navigator & { connection?: NetworkInformationHints })
-        .connection;
-
-    return (
-        Boolean(connection?.saveData) || SLOW_EFFECTIVE_TYPES.has(connection?.effectiveType ?? '')
-    );
-}
-
 export function isConstrainedDevice(): boolean {
     return matchMedia(CONSTRAINED_DEVICE_QUERY).matches;
 }
@@ -57,14 +64,6 @@ export function canRunScenes(): boolean {
     if (isSlowConnection() || matchMedia(REDUCED_MOTION_QUERY).matches) return false;
 
     return readWebglSupport().isSupported;
-}
-
-function subscribeToReducedMotion(onChange: () => void) {
-    const query = matchMedia(REDUCED_MOTION_QUERY);
-
-    query.addEventListener('change', onChange);
-
-    return () => query.removeEventListener('change', onChange);
 }
 
 export function usePrefersReducedMotion(): boolean {

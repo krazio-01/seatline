@@ -44,6 +44,12 @@ import {
     type FlightPoint,
 } from '@/components/scenes/flightPath';
 
+type Flight = { plan: FlightPlan; start: number; next: number };
+
+type Emission = { sinceLast: number; cursor: number; serial: number; frameSeconds: number };
+
+type FlightState = { flight: Flight | null; bank: number; previousNozzles: Vector3[] | null };
+
 const CAMERA_FOV = 30;
 const JET_SCALE = 0.7;
 const FIRST_FLIGHT_DELAY = 0.6;
@@ -176,8 +182,29 @@ const STRIPE_DISPLAY_COLORS = SMOKE_STRIPES.map((stripe) => {
 });
 
 const SMOKE_ATTRIBUTES = ['aOrigin', 'aSpread', 'aVelocity', 'aColor', 'aBirth'] as const;
-
 const NOZZLE_LOCAL_POSITIONS = NOZZLE_OFFSETS.map((z) => new Vector3(NOZZLE_X, -0.02, z));
+
+const WING = [
+    [1.7, 0.3],
+    [0.6, 0.62],
+    [-1.15, 2.25],
+    [-1.6, 2.25],
+    [-1.95, 0.3],
+] satisfies [number, number][];
+
+const TAILPLANE = [
+    [-2.1, 0.3],
+    [-2.8, 1.25],
+    [-3.05, 1.25],
+    [-3.0, 0.3],
+] satisfies [number, number][];
+
+const FIN = [
+    [-1.7, 0],
+    [-2.5, 1.2],
+    [-2.8, 1.2],
+    [-2.95, 0],
+] satisfies [number, number][];
 
 function createShape(points: [number, number][]): Shape {
     const shape = new Shape();
@@ -234,28 +261,6 @@ function createFuselage(): BufferGeometry {
 
     return fuselage;
 }
-
-const WING = [
-    [1.7, 0.3],
-    [0.6, 0.62],
-    [-1.15, 2.25],
-    [-1.6, 2.25],
-    [-1.95, 0.3],
-] satisfies [number, number][];
-
-const TAILPLANE = [
-    [-2.1, 0.3],
-    [-2.8, 1.25],
-    [-3.05, 1.25],
-    [-3.0, 0.3],
-] satisfies [number, number][];
-
-const FIN = [
-    [-1.7, 0],
-    [-2.5, 1.2],
-    [-2.8, 1.2],
-    [-2.95, 0],
-] satisfies [number, number][];
 
 function createJetGeometries() {
     const wings = [WING, mirrored(WING)].map((outline) => {
@@ -392,8 +397,6 @@ function createSmoke() {
     return { geometry, material };
 }
 
-type Flight = { plan: FlightPlan; start: number; next: number };
-
 function placeOnScreen(
     plan: FlightPlan,
     progress: number,
@@ -418,10 +421,6 @@ function headingAt(plan: FlightPlan, progress: number, camera: PerspectiveCamera
 
     return target.subVectors(scratchVectors.ahead, scratchVectors.behind).normalize();
 }
-
-type Emission = { sinceLast: number; cursor: number; serial: number; frameSeconds: number };
-
-type FlightState = { flight: Flight | null; bank: number; previousNozzles: Vector3[] | null };
 
 function startFlightIfDue(
     flightState: FlightState,

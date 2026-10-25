@@ -28,7 +28,26 @@ import {
     ROW_RISE,
     ROW_SPACING,
     type HallLayout,
+    type Point3,
 } from '@/components/scenes/seatLayout';
+import type { ZoneName } from '@/types/booking';
+
+export type ZoneSignPlacement = { zone: ZoneName; position: Point3; isHighlighted: boolean };
+
+type Beam = {
+    position: Vector3;
+    quaternion: Quaternion;
+    length: number;
+    radius: number;
+    poolCenter: Vector3;
+};
+
+const ZONE_SIGN_SIZE: [number, number] = [2.6, 0.65];
+
+const ZONE_SIGN_STYLES = {
+    plain: { background: '#18181b', color: '#e4e4e7', glowColor: '#1c1c22' },
+    highlighted: { background: '#fafafa', color: '#09090b', glowColor: '#ffffff' },
+};
 
 const SCREEN_TEXTURE = { width: 2048, height: 512, padding: 124, size: 190, spacing: 0.12 };
 const LOW_POWER_SCREEN_TEXTURE = { width: 1024, height: 256, padding: 62, size: 95, spacing: 0.12 };
@@ -36,6 +55,7 @@ const BEAM_COLOR = new Color('#ffe2b0');
 const STEP_LIGHT_COLOR = '#fff4d6';
 const STEP_GLOW_COLOR = '#f5b544';
 const UP = new Vector3(0, 1, 0);
+
 const LIGHT_BLENDING = {
     blending: CustomBlending,
     blendSrc: SrcAlphaFactor,
@@ -67,14 +87,6 @@ void main() {
     gl_FragColor = vec4(uColor * body * falloff * uStrength, 1.0);
 }`;
 
-type Beam = {
-    position: Vector3;
-    quaternion: Quaternion;
-    length: number;
-    radius: number;
-    poolCenter: Vector3;
-};
-
 function aimBeam(source: Vector3, target: Vector3): Beam {
     const span = source.clone().sub(target);
     const length = span.length();
@@ -88,18 +100,48 @@ function aimBeam(source: Vector3, target: Vector3): Beam {
     };
 }
 
+function ZoneSign({ sign, fontFamily }: { sign: ZoneSignPlacement; fontFamily: string }) {
+    const style = sign.isHighlighted ? ZONE_SIGN_STYLES.highlighted : ZONE_SIGN_STYLES.plain;
+
+    const texture = useMemo(
+        () =>
+            createLabelTexture({
+                text: `ZONE ${sign.zone}`,
+                width: 1024,
+                height: 256,
+                size: 130,
+                spacing: 0.25,
+                maxTextWidth: 900,
+                fontFamily,
+                ...style,
+            }),
+        [sign.zone, fontFamily, style],
+    );
+
+    useEffect(() => () => texture.dispose(), [texture]);
+
+    return (
+        <mesh position={sign.position} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={ZONE_SIGN_SIZE} />
+            <meshBasicMaterial map={texture} toneMapped={false} />
+        </mesh>
+    );
+}
+
 export function AuditoriumHall({
     rows,
     hall,
     eventName,
     fontFamily,
     softDiscTexture,
+    zoneSigns,
 }: {
     rows: number;
     hall: HallLayout;
     eventName: string;
     fontFamily: string;
     softDiscTexture: CanvasTexture;
+    zoneSigns: ZoneSignPlacement[];
 }) {
     const stepLightsRef = useRef<InstancedMesh>(null);
     const stepGlowsRef = useRef<InstancedMesh>(null);
@@ -324,6 +366,10 @@ export function AuditoriumHall({
                 />
                 <meshBasicMaterial map={stageLabelTexture} toneMapped={false} />
             </mesh>
+
+            {zoneSigns.map((sign) => (
+                <ZoneSign key={sign.zone} sign={sign} fontFamily={fontFamily} />
+            ))}
 
             <mesh position={[0, backWall.height / 2, backWall.z - 0.1]} receiveShadow>
                 <boxGeometry args={[backWall.width + 0.2, backWall.height, 0.2]} />
