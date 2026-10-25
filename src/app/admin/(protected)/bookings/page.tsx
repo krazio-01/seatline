@@ -18,7 +18,7 @@ export default async function Page() {
         <div className="bookings-page">
             <PageHeading
                 title="Bookings"
-                description="Every registration with its seats, email delivery and check-in. Aadhaar numbers stay masked until you reveal them; every reveal is logged."
+                description="Every registration with its zone, email delivery and check-in. Aadhaar numbers stay masked until you reveal them; every reveal is logged."
             />
 
             <Card className="bookings-page-card">

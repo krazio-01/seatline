@@ -1,4 +1,5 @@
 import { type InferSchemaType, type Model, model, models, Schema } from 'mongoose';
+import { EVENT_ZONES } from '@/types/booking';
 
 const guestSchema = new Schema(
     {
@@ -7,6 +8,7 @@ const guestSchema = new Schema(
         aadhaarLast4: { type: String, default: null },
         phone: { type: String, required: true },
         email: { type: String, required: true },
+        photoId: { type: Schema.Types.ObjectId, ref: 'AadhaarPhoto', default: null },
     },
     { _id: false },
 );
@@ -28,8 +30,7 @@ const bookingSchema = new Schema(
         studentGroup: { type: String, required: true },
         idempotencyKey: { type: String, required: true, unique: true },
         qrToken: { type: String, required: true, unique: true },
-        seats: { type: [String], required: true },
-        seatStart: { type: Number, required: true },
+        zone: { type: String, enum: EVENT_ZONES, required: true },
         seatCount: { type: Number, required: true },
         guests: { type: [guestSchema], required: true },
         status: { type: String, enum: ['confirmed', 'checkedIn'], default: 'confirmed' },

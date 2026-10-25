@@ -1,5 +1,6 @@
 import 'server-only';
 import { connectDb } from '@/lib/db';
+import { NotFoundError } from '@/lib/errors';
 import { isWellFormedQrToken } from '@/lib/security/tokens';
 import { type BookingDocument, BookingModel } from '@/models';
 import {
@@ -11,23 +12,32 @@ import {
 } from '@/types/booking';
 import { groupCharacters, maskStart } from '@/utils/text';
 import { writeAudit } from '@/lib/logger';
-import { getEventSettings } from './settings';
+import { issuePhotoToken } from './bookings';
+import { findEventSettings } from './settings';
 
 export type CheckerIdentity = { id: string; name: string };
 
 export type GuestTotals = { guests: number; checkedInGuests: number };
 
-function summarize(booking: BookingDocument): CheckInBooking {
-    return {
-        studentName: booking.studentName,
-        studentGroup: booking.studentGroup,
-        seats: booking.seats,
-        guests: booking.guests.map((guest) => ({
+async function summarize(booking: BookingDocument, checkerId: string): Promise<CheckInBooking> {
+    const guests = await Promise.all(
+        booking.guests.map(async (guest) => ({
             name: guest.name,
             aadhaarMasked: guest.aadhaarLast4
                 ? groupCharacters(maskStart(guest.aadhaarLast4, AADHAAR_LENGTH), AADHAAR_GROUP_SIZE)
                 : null,
+            photoToken: guest.photoId
+                ? await issuePhotoToken(String(guest.photoId), checkerId)
+                : null,
         })),
+    );
+
+    return {
+        studentName: booking.studentName,
+        studentGroup: booking.studentGroup,
+        zone: booking.zone,
+        seatCount: booking.seatCount,
+        guests,
     };
 }
 
@@ -57,7 +67,7 @@ export async function checkInByToken(
 
     if (checkedIn) {
         await writeAudit({ actor, action: 'checkin.success', targetId: String(checkedIn._id), ip });
-        return { outcome: 'checked_in', ...summarize(checkedIn) };
+        return { outcome: 'checked_in', ...(await summarize(checkedIn, checker.id)) };
     }
 
     const existing = await BookingModel.findOne({ qrToken: token }, null, { lean: true });
@@ -70,7 +80,7 @@ export async function checkInByToken(
         checkedInAt: existing.checkedInAt?.toISOString() ?? '',
         checkedInByName: existing.checkedInByName ?? null,
         isOwnCheckIn: existing.checkedInBy === checker.id,
-        ...summarize(existing),
+        ...(await summarize(existing, checker.id)),
     };
 }
 
@@ -92,12 +102,21 @@ export async function countGuests(): Promise<GuestTotals> {
     return { guests: totals?.guests ?? 0, checkedInGuests: totals?.checkedInGuests ?? 0 };
 }
 
-export async function getGateProgress(): Promise<GateProgress> {
-    const [settings, totals] = await Promise.all([getEventSettings(), countGuests()]);
+export async function findGateProgress(): Promise<GateProgress | null> {
+    const [settings, totals] = await Promise.all([findEventSettings(), countGuests()]);
+
+    if (!settings) return null;
 
     return {
         guestsIn: totals.checkedInGuests,
         guestsExpected: totals.guests,
         eventStartsAt: settings.eventDate.toISOString(),
     };
+}
+
+export async function getGateProgress(): Promise<GateProgress> {
+    const progress = await findGateProgress();
+    if (!progress) throw new NotFoundError('Event settings are not configured');
+
+    return progress;
 }

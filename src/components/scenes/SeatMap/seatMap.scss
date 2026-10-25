@@ -58,8 +58,8 @@
                 }
             }
 
-            .seat-map-own-seats {
-                animation: seat-map-own-seats-enter $duration-base $ease-out both;
+            .seat-map-own-zone {
+                animation: seat-map-own-zone-enter $duration-base $ease-out both;
             }
         }
     }
@@ -99,7 +99,7 @@
     }
 }
 
-@keyframes seat-map-own-seats-enter {
+@keyframes seat-map-own-zone-enter {
     from {
         opacity: 0;
         transform: translateX(-6px);

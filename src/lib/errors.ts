@@ -44,6 +44,12 @@ export class IdempotencyKeyConflictError extends DomainError {
     }
 }
 
+export class AadhaarPhotoRejectedError extends DomainError {
+    constructor(message: string) {
+        super('aadhaar_photo_rejected', 422, message, [{ path: 'image', message }]);
+    }
+}
+
 export class NotEnoughSeatsError extends DomainError {
     constructor() {
         super('not_enough_seats', 409, 'Not enough seats are left for this many guests.');
@@ -142,13 +148,25 @@ export class EmailNotVerifiedError extends DomainError {
     }
 }
 
+export class ServiceBusyError extends DomainError {
+    readonly retryAfterSeconds = 20;
+
+    constructor() {
+        super(
+            'service_busy',
+            503,
+            'We are checking a lot of cards right now. Try again in a moment.',
+        );
+    }
+}
+
 export function toErrorResponse(error: DomainError): Response {
     return Response.json(
         { error: { code: error.code, message: error.message, details: error.details } },
         {
             status: error.status,
             headers:
-                error instanceof RateLimitedError
+                error instanceof RateLimitedError || error instanceof ServiceBusyError
                     ? { 'Retry-After': String(error.retryAfterSeconds) }
                     : undefined,
         },

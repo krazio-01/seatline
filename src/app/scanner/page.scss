@@ -48,6 +48,16 @@
         }
     }
 
+    .scanner-unavailable {
+        display: grid;
+        flex: 1;
+        place-items: center;
+        width: 100%;
+        max-width: 480px;
+        margin: 0 auto;
+        padding: 24px 16px;
+    }
+
     .scanner-main {
         display: flex;
         flex: 1;

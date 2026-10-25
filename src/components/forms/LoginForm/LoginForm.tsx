@@ -186,12 +186,19 @@ export function LoginForm({
                         data-visible={isCapsLockOn || undefined}
                         aria-live="polite"
                     >
-                        {isCapsLockOn ? 'Caps Lock is on' : ''}
+                        <span className="login-form-caps-lock-text">
+                            {isCapsLockOn ? 'Caps Lock is on' : ''}
+                        </span>
                     </p>
                 </div>
 
-                <p id={errorId} className="login-form-error" role="alert">
-                    {formError}
+                <p
+                    id={errorId}
+                    className="login-form-error"
+                    role="alert"
+                    data-visible={formError ? true : undefined}
+                >
+                    <span className="login-form-error-text">{formError}</span>
                 </p>
 
                 <FormSubmit className="login-form-submit" size="lg" loading={isBusy}>

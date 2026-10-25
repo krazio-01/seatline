@@ -14,8 +14,8 @@ import { EntryFeed } from '@/components/widgets/EntryFeed/EntryFeed';
 import { StatTiles } from '@/components/widgets/StatTiles/StatTiles';
 import { useAppContext } from '@/context/appContext';
 import { consecutiveFailures } from '@/context/appStore';
+import { diffSeatStates, zoneSeatStates } from '@/components/scenes/seatLayout';
 import { formatDate } from '@/utils/dates';
-import { diffSeatStates } from '@/utils/seats';
 
 const BOOKINGS_PAGE_SIZE = 10;
 const RECONNECTING_AFTER_FAILURES = 2;
@@ -30,16 +30,19 @@ function percentOf(part: number, whole: number): number {
 }
 
 export default function Page() {
-    const { event, stats, seats, gateEvents } = useAppContext('dashboard');
+    const { event, stats, zones, gateEvents } = useAppContext('dashboard');
     const connection = useAppContext('connection');
     const hallRef = useRef<HTMLDivElement>(null);
     const [isHallReady, setIsHallReady] = useState(false);
-    const [seatHistory, setSeatHistory] = useState({ seats, pulseLabels: [] as string[] });
+    const [seatHistory, setSeatHistory] = useState({ zones, pulseKeys: [] as string[] });
 
     const shouldLoadHall = useSceneGate(hallRef);
 
-    if (seatHistory.seats !== seats) {
-        setSeatHistory({ seats, pulseLabels: diffSeatStates(seatHistory.seats, seats) });
+    if (seatHistory.zones !== zones) {
+        setSeatHistory({
+            zones,
+            pulseKeys: diffSeatStates(zoneSeatStates(seatHistory.zones), zoneSeatStates(zones)),
+        });
     }
 
     const liveState =
@@ -166,21 +169,16 @@ export default function Page() {
                         data-scene-ready={isHallReady || undefined}
                     >
                         <AuditoriumFallback
-                            rows={event.rows}
-                            seatsPerRow={event.seatsPerRow}
-                            seatStates={seats}
-                            highlightedSeatLabels={[]}
+                            zones={zones}
                             eventName={event.eventName}
                             variant="admin"
                         />
 
                         {shouldLoadHall && (
                             <LazyAuditorium
-                                rows={event.rows}
-                                seatsPerRow={event.seatsPerRow}
-                                seatStates={seats}
+                                zones={zones}
                                 eventName={event.eventName}
-                                pulseLabels={seatHistory.pulseLabels}
+                                pulseKeys={seatHistory.pulseKeys}
                                 variant="admin"
                                 startsAtRest
                                 onFirstFrame={() => setIsHallReady(true)}

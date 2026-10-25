@@ -45,14 +45,6 @@ export const AUDITORIUM_CAMERA = {
 const CENTERING_PASSES = 4;
 const SPRING_REST = 1e-4;
 
-export function viewDirection(yaw: number, elevation: number, out: Point3): Point3 {
-    out[0] = Math.sin(yaw) * Math.cos(elevation);
-    out[1] = Math.sin(elevation);
-    out[2] = Math.cos(yaw) * Math.cos(elevation);
-
-    return out;
-}
-
 function viewBasis(yaw: number, elevation: number): ViewBasis {
     const forwardX = -Math.sin(yaw) * Math.cos(elevation);
     const forwardY = -Math.sin(elevation);
@@ -103,6 +95,14 @@ function requiredDistance(
     }
 
     return distance;
+}
+
+export function viewDirection(yaw: number, elevation: number, out: Point3): Point3 {
+    out[0] = Math.sin(yaw) * Math.cos(elevation);
+    out[1] = Math.sin(elevation);
+    out[2] = Math.cos(yaw) * Math.cos(elevation);
+
+    return out;
 }
 
 export function frameView(request: ViewRequest, out: ViewFraming): ViewFraming {

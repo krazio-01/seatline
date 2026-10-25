@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import type QrScanner from 'qr-scanner';
 import './camera.scss';
-import { SCANNER_HREF } from '@/components/layout/navigation';
+import { SCANNER_SIGN_IN_HREF } from '@/components/layout/navigation';
 import { CameraHud, type CameraHudState } from '@/components/media/Camera/CameraHud';
 import { Button } from '@/components/ui/Button/Button';
 import { Notice } from '@/components/widgets/Notice/Notice';
@@ -31,7 +31,7 @@ type CameraProblem = 'blocked' | 'missing' | 'busy' | 'insecure' | 'stalled';
 
 type CameraState = 'starting' | 'live' | CameraProblem;
 
-type TokenRead = { lastSeenAt: number; failures: number; retryAt: number };
+export type TokenRead = { lastSeenAt: number; failures: number; retryAt: number };
 
 type TorchState = { isAvailable: boolean; isOn: boolean };
 
@@ -202,21 +202,6 @@ function forgetStaleReads(reads: Map<string, TokenRead>, now: number) {
     }
 }
 
-function isReadDue(token: string, read: TokenRead | undefined, now: number): boolean {
-    if (!read) return true;
-
-    if (read.failures > 0) return now >= read.retryAt;
-
-    return shouldAcceptRead(token, token, read.lastSeenAt, now);
-}
-
-function retryDelayMs(failures: number, retryAfterSeconds?: number): number {
-    if (retryAfterSeconds)
-        return Math.min(retryAfterSeconds, MAX_RETRY_AFTER_SECONDS) * MS_PER_SECOND;
-
-    return RETRY_BACKOFF_MS[Math.min(failures, RETRY_BACKOFF_MS.length) - 1];
-}
-
 export function recoverLostCheckIn(
     result: CheckInResult,
     wasRetry: boolean,
@@ -226,18 +211,31 @@ export function recoverLostCheckIn(
 
     if (now - Date.parse(result.checkedInAt) > LOST_REPLY_WINDOW_MS) return result;
 
-    const { studentName, studentGroup, seats, guests } = result;
+    const { studentName, studentGroup, zone, seatCount, guests } = result;
 
-    return { outcome: 'checked_in', studentName, studentGroup, seats, guests };
+    return { outcome: 'checked_in', studentName, studentGroup, zone, seatCount, guests };
 }
 
-export function shouldAcceptRead(
-    token: string,
-    lastToken: string | null,
-    lastAt: number,
-    now: number,
-): boolean {
-    return token !== lastToken || now - lastAt >= SAME_TOKEN_WINDOW_MS;
+export function isReadDue(read: TokenRead | undefined, now: number): boolean {
+    if (!read) return true;
+
+    if (read.failures > 0) return now >= read.retryAt;
+
+    return now - read.lastSeenAt >= SAME_TOKEN_WINDOW_MS;
+}
+
+export function retryDelayMs(failures: number, retryAfterSeconds?: number): number {
+    if (retryAfterSeconds) {
+        return Math.min(retryAfterSeconds, MAX_RETRY_AFTER_SECONDS) * MS_PER_SECOND;
+    }
+
+    return RETRY_BACKOFF_MS[Math.min(failures, RETRY_BACKOFF_MS.length) - 1];
+}
+
+export function coolDownUntil(failedAt: number, retryAfterSeconds?: number): number {
+    return (
+        failedAt + (retryAfterSeconds ? retryDelayMs(1, retryAfterSeconds) : FAILURE_COOL_DOWN_MS)
+    );
 }
 
 export function Camera() {
@@ -251,6 +249,7 @@ export function Camera() {
     const scannerRef = useRef<QrScanner | null>(null);
     const [cameraState, setCameraState] = useState<CameraState>('starting');
     const [torch, setTorch] = useState<TorchState>(NO_TORCH);
+    const [isTorchUnavailable, setIsTorchUnavailable] = useState(false);
     const [isCameraOn, setIsCameraOn] = useState(true);
     const [startAttempt, setStartAttempt] = useState(0);
 
@@ -291,7 +290,7 @@ export function Camera() {
 
             const read = reads.get(token);
 
-            if (read && !isReadDue(token, read, now)) {
+            if (read && !isReadDue(read, now)) {
                 read.lastSeenAt = now;
                 return;
             }
@@ -316,7 +315,7 @@ export function Camera() {
                 const status = requestError instanceof ApiError ? requestError.status : null;
 
                 if (status === 401) {
-                    window.location.replace(SCANNER_HREF);
+                    window.location.replace(SCANNER_SIGN_IN_HREF);
                     return;
                 }
 
@@ -331,9 +330,7 @@ export function Camera() {
                     sentRead.lastSeenAt = failedAt;
                     sentRead.retryAt =
                         failedAt + retryDelayMs(sentRead.failures, retryAfterSeconds);
-                    coolDownUntilRef.current = retryAfterSeconds
-                        ? sentRead.retryAt
-                        : failedAt + FAILURE_COOL_DOWN_MS;
+                    coolDownUntilRef.current = coolDownUntil(failedAt, retryAfterSeconds);
                     updateAppContext('scanner', (current) =>
                         recordCheckInFailure(current, (requestError as Error).message),
                     );
@@ -451,8 +448,21 @@ export function Camera() {
 
         if (!scanner) return;
 
-        await scanner.toggleFlash();
+        try {
+            await scanner.toggleFlash();
+        } catch {
+            setTorch(NO_TORCH);
+            setIsTorchUnavailable(true);
+            return;
+        }
+
         setTorch({ isAvailable: true, isOn: scanner.isFlashOn() });
+
+        const stream = videoRef.current?.srcObject;
+
+        if (stream instanceof MediaStream) {
+            for (const track of stream.getVideoTracks()) void keepFocusContinuous(track);
+        }
     };
 
     const retry = () => {
@@ -496,7 +506,7 @@ export function Camera() {
                     </div>
                 )}
 
-                {isCameraOn && (
+                {isCameraOn && !problem && (
                     <p className="camera-hint">
                         <span className="camera-hint-text">{hint}</span>
                     </p>
@@ -527,6 +537,13 @@ export function Camera() {
                             )}
                             {torch.isOn ? 'Turn torch off' : 'Turn torch on'}
                         </Button>
+                    )}
+
+                    {isTorchUnavailable && (
+                        <p className="camera-controls-notice" role="status">
+                            <FlashlightOffIcon aria-hidden="true" />
+                            The torch is not available on this camera.
+                        </p>
                     )}
                 </div>
             )}

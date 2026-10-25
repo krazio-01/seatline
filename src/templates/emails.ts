@@ -1,5 +1,6 @@
+import { ZONE_LABELS, type ZoneName } from '@/types/booking';
 import { formatDate } from '@/utils/dates';
-import { escapeHtml } from '@/utils/text';
+import { escapeHtml, pluralize } from '@/utils/text';
 
 export type ConfirmationEmailData = {
     eventName: string;
@@ -8,7 +9,8 @@ export type ConfirmationEmailData = {
     venue: string;
     studentName: string;
     guestNames: string[];
-    seats: string[];
+    zone: ZoneName;
+    seatCount: number;
     qrContentId: string;
 };
 
@@ -18,12 +20,8 @@ export function renderConfirmationEmail(data: ConfirmationEmailData): {
 } {
     const eventName = escapeHtml(data.eventName);
 
-    const guestRows = data.guestNames
-        .map(
-            (name, index) =>
-                `<li>${escapeHtml(name)} &mdash; seat <strong>${escapeHtml(data.seats[index])}</strong></li>`,
-        )
-        .join('');
+    const guestRows = data.guestNames.map((name) => `<li>${escapeHtml(name)}</li>`).join('');
+    const seatSummary = `${data.seatCount} ${pluralize(data.seatCount, 'seat')} registered in ${ZONE_LABELS[data.zone]}`;
 
     const html = `<!doctype html>
 <html><body style="margin:0;background:#f6f5f1;font-family:Arial,Helvetica,sans-serif;color:#1b1b1f;">
@@ -38,7 +36,8 @@ export function renderConfirmationEmail(data: ConfirmationEmailData): {
 <p style="margin:0 0 4px;"><strong>When:</strong> ${escapeHtml(formatDate(data.eventDate, 'fullDateTime'))}</p>
 <p style="margin:0 0 4px;"><strong>Gates open:</strong> ${escapeHtml(formatDate(data.gatesOpenAt, 'fullDateTime'))}</p>
 <p style="margin:0 0 16px;"><strong>Where:</strong> ${escapeHtml(data.venue)}</p>
-<p style="margin:0 0 4px;"><strong>Guests and seats</strong></p>
+<p style="margin:0 0 16px;"><strong>Seats:</strong> ${escapeHtml(seatSummary)}</p>
+<p style="margin:0 0 4px;"><strong>Guests</strong></p>
 <ul style="margin:0 0 20px;padding-left:20px;">${guestRows}</ul>
 <div style="text-align:center;margin:8px 0 16px;"><img src="cid:${escapeHtml(data.qrContentId)}" width="220" height="220" alt="Entry QR code" style="display:inline-block;"></div>
 <p style="margin:0;color:#5f6368;font-size:13px;text-align:center;">Show this QR code at the gate. It is valid once for your whole party.</p>

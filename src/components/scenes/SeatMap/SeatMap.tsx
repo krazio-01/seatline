@@ -1,18 +1,8 @@
 import './seatMap.scss';
 import { Reveal } from '@/components/ui/Animations/Animations';
-import { OwnSeatsLegendItem, SeatMapScene } from '@/components/scenes/SeatMap/SeatMapScene';
+import { OwnZoneLegendItem, SeatMapScene } from '@/components/scenes/SeatMap/SeatMapScene';
 
-export function SeatMap({
-    rows,
-    seatsPerRow,
-    venue,
-    eventName,
-}: {
-    rows: number;
-    seatsPerRow: number;
-    venue: string;
-    eventName: string;
-}) {
+export function SeatMap({ venue, eventName }: { venue: string; eventName: string }) {
     return (
         <Reveal className="seat-map" delay={0.2}>
             <div className="seat-map-header">
@@ -29,11 +19,11 @@ export function SeatMap({
                         <i className="seat-map-swatch" data-state="booked" />
                         Booked
                     </li>
-                    <OwnSeatsLegendItem />
+                    <OwnZoneLegendItem />
                 </ul>
             </div>
 
-            <SeatMapScene rows={rows} seatsPerRow={seatsPerRow} eventName={eventName} />
+            <SeatMapScene eventName={eventName} />
         </Reveal>
     );
 }

@@ -9,20 +9,23 @@ import { useToast } from '@/components/ui/Toast/Toast';
 import { useRefreshSlice } from '@/context/appContext';
 import { ApiError, api, fieldErrorsOf } from '@/services/client/api';
 import type { EventSettings } from '@/types/admin';
+import { EVENT_ZONES, ZONE_LABELS, type ZoneName } from '@/types/booking';
 import { fromDateTimeInputValue, toDateTimeInputValue } from '@/utils/dates';
 
+type ZoneField = `zoneCapacities.${ZoneName}`;
+
 type SettingsField =
-    | 'eventName'
-    | 'eventDate'
-    | 'gatesOpenAt'
-    | 'venue'
-    | 'rows'
-    | 'seatsPerRow'
-    | 'maxGuestsPerBooking';
+    'eventName' | 'eventDate' | 'gatesOpenAt' | 'venue' | ZoneField | 'maxGuestsPerBooking';
 
 type FieldKind = 'text' | 'dateTime' | 'number';
 
-type FieldConfig = { name: SettingsField; label: string; kind: FieldKind; hint?: string };
+type FieldConfig = {
+    name: SettingsField;
+    label: string;
+    kind: FieldKind;
+    hint?: string;
+    min?: number;
+};
 
 const FIELD_SECTIONS: { title: string; columns: number; fields: FieldConfig[] }[] = [
     {
@@ -44,18 +47,19 @@ const FIELD_SECTIONS: { title: string; columns: number; fields: FieldConfig[] }[
         title: 'Seating',
         columns: 3,
         fields: [
-            { name: 'rows', label: 'Rows', kind: 'number' },
-            {
-                name: 'seatsPerRow',
-                label: 'Seats per row',
+            ...EVENT_ZONES.map((zone): FieldConfig => ({
+                name: zoneField(zone),
+                label: `${ZONE_LABELS[zone]} seats`,
                 kind: 'number',
-                hint: 'Fixed once seats are allocated.',
-            },
+                hint: "Can't go below the seats already allocated in the zone.",
+                min: 0,
+            })),
             {
                 name: 'maxGuestsPerBooking',
                 label: 'Guest limit',
                 kind: 'number',
                 hint: 'Guests one student can bring.',
+                min: 1,
             },
         ],
     },
@@ -71,14 +75,26 @@ const ALL_FIELDS = FIELD_SECTIONS.flatMap((section) => section.fields);
 
 const ALL_FIELD_NAMES = ALL_FIELDS.map((field) => field.name);
 
+function zoneField(zone: ZoneName): ZoneField {
+    return `zoneCapacities.${zone}`;
+}
+
+function zoneInputValues(settings: EventSettings): Record<ZoneField, string> {
+    return Object.fromEntries(
+        EVENT_ZONES.map((zone) => [
+            zoneField(zone),
+            String(settings.zones.find((candidate) => candidate.name === zone)?.capacity ?? 0),
+        ]),
+    ) as Record<ZoneField, string>;
+}
+
 function toInputValues(settings: EventSettings): Record<SettingsField, string> {
     return {
         eventName: settings.eventName,
         eventDate: toDateTimeInputValue(new Date(settings.eventDate)),
         gatesOpenAt: toDateTimeInputValue(new Date(settings.gatesOpenAt)),
         venue: settings.venue,
-        rows: String(settings.rows),
-        seatsPerRow: String(settings.seatsPerRow),
+        ...zoneInputValues(settings),
         maxGuestsPerBooking: String(settings.maxGuestsPerBooking),
     };
 }
@@ -125,8 +141,9 @@ export function SettingsForm({ settings }: { settings: EventSettings }) {
                 eventDate: fromDateTimeInputValue(values.eventDate).toISOString(),
                 gatesOpenAt: fromDateTimeInputValue(values.gatesOpenAt).toISOString(),
                 venue: values.venue,
-                rows: Number(values.rows),
-                seatsPerRow: Number(values.seatsPerRow),
+                zoneCapacities: Object.fromEntries(
+                    EVENT_ZONES.map((zone) => [zone, Number(values[zoneField(zone)])]),
+                ) as Record<ZoneName, number>,
                 maxGuestsPerBooking: Number(values.maxGuestsPerBooking),
                 bookingsOpen: formData.get('bookingsOpen') === 'on',
             });
@@ -140,7 +157,10 @@ export function SettingsForm({ settings }: { settings: EventSettings }) {
             const serverErrors = fieldErrorsOf(error);
 
             setFieldErrors(serverErrors);
-            setFormError(Object.keys(serverErrors).length ? undefined : error.message);
+            setFormError(
+                serverErrors.zoneCapacities ??
+                    (Object.keys(serverErrors).length ? undefined : error.message),
+            );
         } finally {
             setIsSaving(false);
         }
@@ -161,7 +181,7 @@ export function SettingsForm({ settings }: { settings: EventSettings }) {
                                 hint={field.hint}
                                 error={fieldErrors[field.name]}
                                 type={INPUT_TYPES[field.kind]}
-                                min={field.kind === 'number' ? 1 : undefined}
+                                min={field.min}
                                 inputMode={field.kind === 'number' ? 'numeric' : undefined}
                                 defaultValue={initialValues[field.name]}
                             />
@@ -179,8 +199,8 @@ export function SettingsForm({ settings }: { settings: EventSettings }) {
                             Bookings open
                         </span>
                         <p id={`${bookingsOpenId}-hint`} className="settings-form-hint">
-                            {settings.nextSeatIndex} of {settings.totalSeats} seats allocated. Close
-                            bookings to stop new registrations.
+                            {settings.allocatedSeats} of {settings.totalSeats} seats allocated.
+                            Close bookings to stop new registrations.
                         </p>
                     </div>
                     <Switch

@@ -21,88 +21,18 @@ import type {
     StudentOption,
 } from '@/types/booking';
 
-export class ApiError extends Error {
-    constructor(
-        readonly status: number,
-        readonly code: string,
-        message: string,
-        readonly details?: unknown,
-        readonly retryAfterSeconds?: number,
-    ) {
-        super(message);
-        this.name = 'ApiError';
-    }
-}
-
 export type FieldIssue = { path: string; message: string };
-
-export function fieldErrorsOf(error: unknown): Record<string, string> {
-    if (!(error instanceof ApiError) || !Array.isArray(error.details)) return {};
-
-    const messages: Record<string, string> = {};
-
-    for (const issue of error.details as FieldIssue[]) messages[issue.path] ??= issue.message;
-
-    return messages;
-}
 
 type RequestOptions = {
     method?: string;
     json?: unknown;
+    form?: FormData;
     headers?: Record<string, string>;
     acceptedStatuses?: number[];
     signal?: AbortSignal;
 };
 
 type QueryValues = Record<string, string | number | boolean | undefined>;
-
-async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-    const hasBody = options.json !== undefined;
-    const request = fetch(path, {
-        method: options.method ?? (hasBody ? 'POST' : 'GET'),
-        headers: { ...(hasBody && { 'Content-Type': 'application/json' }), ...options.headers },
-        body: hasBody ? JSON.stringify(options.json) : undefined,
-        signal: options.signal,
-    });
-
-    const response = await request.catch((networkError: unknown) => {
-        throw new ApiError(
-            0,
-            'network_error',
-            'Check your connection and try again.',
-            networkError,
-        );
-    });
-
-    if (!response.ok && !options.acceptedStatuses?.includes(response.status)) {
-        const body = (await response.json().catch(() => undefined)) as
-            { error?: { code?: string; message?: string; details?: unknown } } | undefined;
-
-        throw new ApiError(
-            response.status,
-            body?.error?.code ?? 'unknown_error',
-            body?.error?.message ?? 'Something went wrong. Please try again.',
-            body?.error?.details,
-            Number(response.headers.get('Retry-After')) || undefined,
-        );
-    }
-
-    if (response.status === 204) return undefined as T;
-
-    return (await response.json()) as T;
-}
-
-function withQuery(path: string, query: QueryValues): string {
-    const params = new URLSearchParams();
-
-    for (const [key, value] of Object.entries(query)) {
-        if (value !== undefined && value !== '') params.set(key, String(value));
-    }
-
-    const queryString = params.toString();
-
-    return queryString ? `${path}?${queryString}` : path;
-}
 
 const API_ROOT = '/api/v1';
 
@@ -133,6 +63,28 @@ export const api = {
                 json: { code },
             }),
     },
+    aadhaarPhotos: {
+        upload: (
+            photo: { image: Blob; aadhaar: string; name: string },
+            signal?: AbortSignal,
+        ): Promise<{ photoId: string }> => {
+            const form = new FormData();
+
+            form.set('image', photo.image, 'aadhaar-card.jpg');
+            form.set('aadhaar', photo.aadhaar);
+            form.set('name', photo.name);
+
+            return apiRequest(`${API_ROOT}/aadhaar-photos`, { form, signal });
+        },
+        originalUrl: (bookingId: string, guestIndex: number): string =>
+            `${API_ROOT}/bookings/${encodeURIComponent(bookingId)}/aadhaar/photos/${guestIndex}`,
+        maskedUrl: (photoToken: string): string =>
+            withQuery(`${API_ROOT}/check-ins/photos`, { token: photoToken }),
+        deleteForBooking: (bookingId: string): Promise<{ deleted: number }> =>
+            apiRequest(`${API_ROOT}/bookings/${encodeURIComponent(bookingId)}/aadhaar/photos`, {
+                method: 'DELETE',
+            }),
+    },
     bookings: {
         list: (query: BookingListQuery, signal?: AbortSignal): Promise<BookingPage> =>
             apiRequest<BookingPage>(withQuery(`${API_ROOT}/bookings`, query), { signal }),
@@ -146,7 +98,7 @@ export const api = {
             }),
         revealAadhaar: (
             bookingId: string,
-        ): Promise<{ guests: { name: string; aadhaar: string | null }[] }> =>
+        ): Promise<{ guests: { name: string; aadhaar: string | null; hasPhoto: boolean }[] }> =>
             apiRequest(`${API_ROOT}/bookings/${encodeURIComponent(bookingId)}/aadhaar`),
         resendConfirmationEmail: (bookingId: string): Promise<EmailDelivery> =>
             apiRequest<EmailDelivery>(
@@ -198,3 +150,74 @@ export const api = {
             apiRequest<EventSettings>(`${API_ROOT}/settings`, { method: 'PUT', json: values }),
     },
 };
+
+async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+    const hasJson = options.json !== undefined;
+    const request = fetch(path, {
+        method: options.method ?? (hasJson || options.form ? 'POST' : 'GET'),
+        headers: { ...(hasJson && { 'Content-Type': 'application/json' }), ...options.headers },
+        body: hasJson ? JSON.stringify(options.json) : options.form,
+        signal: options.signal,
+    });
+
+    const response = await request.catch((networkError: unknown) => {
+        throw new ApiError(
+            0,
+            'network_error',
+            'Check your connection and try again.',
+            networkError,
+        );
+    });
+
+    if (!response.ok && !options.acceptedStatuses?.includes(response.status)) {
+        const body = (await response.json().catch(() => undefined)) as
+            { error?: { code?: string; message?: string; details?: unknown } } | undefined;
+
+        throw new ApiError(
+            response.status,
+            body?.error?.code ?? 'unknown_error',
+            body?.error?.message ?? 'Something went wrong. Please try again.',
+            body?.error?.details,
+            Number(response.headers.get('Retry-After')) || undefined,
+        );
+    }
+
+    if (response.status === 204) return undefined as T;
+
+    return (await response.json()) as T;
+}
+
+function withQuery(path: string, query: QueryValues): string {
+    const params = new URLSearchParams();
+
+    for (const [key, value] of Object.entries(query)) {
+        if (value !== undefined && value !== '') params.set(key, String(value));
+    }
+
+    const queryString = params.toString();
+
+    return queryString ? `${path}?${queryString}` : path;
+}
+
+export class ApiError extends Error {
+    constructor(
+        readonly status: number,
+        readonly code: string,
+        message: string,
+        readonly details?: unknown,
+        readonly retryAfterSeconds?: number,
+    ) {
+        super(message);
+        this.name = 'ApiError';
+    }
+}
+
+export function fieldErrorsOf(error: unknown): Record<string, string> {
+    if (!(error instanceof ApiError) || !Array.isArray(error.details)) return {};
+
+    const messages: Record<string, string> = {};
+
+    for (const issue of error.details as FieldIssue[]) messages[issue.path] ??= issue.message;
+
+    return messages;
+}

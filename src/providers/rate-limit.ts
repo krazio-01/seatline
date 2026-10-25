@@ -7,6 +7,12 @@ import { getClientIp } from '@/utils/http';
 
 export type RateLimitRule = { max: number; windowSeconds: number };
 
+export type RateLimitResult = { allowed: boolean; retryAfterSeconds: number };
+
+export interface RateLimiter {
+    limit(key: string, rule: RateLimitRule): Promise<RateLimitResult>;
+}
+
 export const RATE_LIMITS = {
     booking: { max: 10, windowSeconds: 600 },
     studentsList: { max: 60, windowSeconds: 60 },
@@ -18,15 +24,13 @@ export const RATE_LIMITS = {
     emailVerificationPerAddress: { max: 3, windowSeconds: 900 },
     emailVerificationConfirm: { max: 30, windowSeconds: 900 },
     aadhaarReveal: { max: 30, windowSeconds: 3600 },
+    aadhaarPhotoUpload: { max: 20, windowSeconds: 600 },
+    aadhaarPhotoView: { max: 600, windowSeconds: 3600 },
 } as const satisfies Record<string, RateLimitRule>;
 
+let rateLimiter: RateLimiter | undefined;
+
 export type RateLimitName = keyof typeof RATE_LIMITS;
-
-export type RateLimitResult = { allowed: boolean; retryAfterSeconds: number };
-
-export interface RateLimiter {
-    limit(key: string, rule: RateLimitRule): Promise<RateLimitResult>;
-}
 
 export function createMemoryRateLimiter(): RateLimiter {
     const windows = new Map<string, { count: number; resetAt: number }>();
@@ -73,8 +77,6 @@ export function createUpstashRateLimiter(url: string, token: string): RateLimite
         },
     };
 }
-
-let rateLimiter: RateLimiter | undefined;
 
 export function getRateLimiter(): RateLimiter {
     const env = getEnv();

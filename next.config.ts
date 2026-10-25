@@ -29,13 +29,16 @@ const baseHeaders = [
 
 const nextConfig: NextConfig = {
     poweredByHeader: false,
-    serverExternalPackages: ['@node-rs/argon2'],
+    serverExternalPackages: ['@node-rs/argon2', 'tesseract.js'],
+    outputFileTracingIncludes: {
+        '/api/v1/aadhaar-photos': ['./node_modules/@tesseract.js-data/*/4.0.0_best_int/*.gz'],
+    },
     sassOptions: { loadPaths: [path.join(process.cwd(), 'src/styles')] },
     async headers() {
         return [
             { source: '/:path*', headers: baseHeaders },
             {
-                source: '/scanner',
+                source: '/scanner/:path*',
                 headers: [
                     ...baseHeaders.filter((header) => header.key !== 'Permissions-Policy'),
                     {

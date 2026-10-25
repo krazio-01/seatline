@@ -2,10 +2,9 @@
 import { m } from 'motion/react';
 import { CheckIcon, MailIcon } from 'lucide-react';
 import './bookingPass.scss';
-import type { BookingConfirmation } from '@/types/booking';
-import type { StudentOption } from '@/types/booking';
-import { formatStudentGroupAndId } from '@/utils/booking-form';
-import { DURATION, EASE_OUT, STAGGER_INTERVAL } from '@/utils/motion';
+import { ZONE_LABELS, type BookingConfirmation, type StudentOption } from '@/types/booking';
+import { DURATION, EASE_OUT } from '@/utils/motion';
+import { pluralize } from '@/utils/text';
 
 export function BookingPass({
     confirmation,
@@ -31,35 +30,24 @@ export function BookingPass({
                 {student && (
                     <p className="booking-pass-student">
                         {student.name}
-                        <span className="booking-pass-meta">
-                            {formatStudentGroupAndId(student)}
-                        </span>
+                        <span className="booking-pass-meta">Group {student.group}</span>
                     </p>
                 )}
             </div>
 
-            <div className="booking-pass-seats">
-                <p className="booking-pass-label">
-                    {confirmation.seats.length === 1 ? 'Seat' : 'Seats'}
+            <m.div
+                className="booking-pass-seats"
+                data-zone={confirmation.zone}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: DURATION.base, ease: EASE_OUT, delay: 0.15 }}
+            >
+                <p className="booking-pass-label">Your zone</p>
+                <p className="booking-pass-zone">{ZONE_LABELS[confirmation.zone]}</p>
+                <p className="booking-pass-seat-count">
+                    {confirmation.seatCount} {pluralize(confirmation.seatCount, 'seat')}
                 </p>
-                <ul className="booking-pass-chips">
-                    {confirmation.seats.map((seat, index) => (
-                        <m.li
-                            key={seat}
-                            className="booking-pass-chip"
-                            initial={{ opacity: 0, y: 6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{
-                                duration: DURATION.base,
-                                ease: EASE_OUT,
-                                delay: 0.15 + index * STAGGER_INTERVAL,
-                            }}
-                        >
-                            {seat}
-                        </m.li>
-                    ))}
-                </ul>
-            </div>
+            </m.div>
 
             <p className="booking-pass-email">
                 <MailIcon aria-hidden="true" />

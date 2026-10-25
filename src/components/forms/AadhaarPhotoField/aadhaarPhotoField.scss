@@ -1,0 +1,74 @@
+@use 'tokens' as *;
+
+.aadhaar-photo-field {
+    display: grid;
+    gap: 10px;
+
+    .aadhaar-photo-field-label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        line-height: 1;
+    }
+
+    .aadhaar-photo-field-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .aadhaar-photo-field-preview {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px;
+        border: 1px solid $color-success-border;
+        border-radius: $radius;
+        background: $color-success-surface;
+
+        .aadhaar-photo-field-thumbnail {
+            width: 72px;
+            height: 46px;
+            border-radius: $radius-sm;
+            object-fit: cover;
+        }
+
+        .aadhaar-photo-field-accepted {
+            display: inline-flex;
+            flex: 1;
+            align-items: center;
+            gap: 6px;
+            color: $color-success-text;
+            font-size: 0.875rem;
+            font-weight: 500;
+
+            svg {
+                width: 16px;
+                height: 16px;
+            }
+        }
+    }
+
+    .aadhaar-photo-field-hint {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: $color-muted-foreground;
+        font-size: 0.75rem;
+
+        .aadhaar-photo-field-spinner {
+            width: 14px;
+            height: 14px;
+            animation: aadhaar-photo-field-spin $duration-spin linear infinite;
+
+            @media (prefers-reduced-motion: reduce) {
+                animation: none;
+            }
+        }
+    }
+}
+
+@keyframes aadhaar-photo-field-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

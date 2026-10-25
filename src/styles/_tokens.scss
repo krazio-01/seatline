@@ -54,6 +54,11 @@ $ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 $duration-fast: 150ms;
 $duration-base: 250ms;
 $duration-slow: 400ms;
+$duration-glide: 800ms;
+$duration-spin: 0.9s;
+$duration-pulse: 1.2s;
+$duration-confetti: 1.8s;
+$duration-banner: 2.8s;
 
 $shadow-xs: 0 1px 2px rgb(0 0 0 / 0.04);
 $shadow-raised:

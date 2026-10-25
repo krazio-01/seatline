@@ -51,26 +51,64 @@ import {
     computeRowEnds,
     computeSeatLayout,
     SEAT_COLORS,
-    SEAT_STATUS_LABEL,
-    seatStatus,
+    seatHoverText,
+    zoneRowCount,
+    zoneSeatKeys,
+    zoneSeatStates,
+    zoneSignPositions,
     type HallLayout,
     type HighlightFocus,
     type Point3,
     type SeatState,
 } from '@/components/scenes/seatLayout';
+import { useZoneSeating } from '@/hooks/useZoneSeating';
+import type { ZoneName, ZoneOccupancy } from '@/types/booking';
 
 type SeatHover = { text: string; x: number; y: number };
 
 type AuditoriumProps = {
-    rows: number;
-    seatsPerRow: number;
-    seatStates: Record<string, SeatState>;
-    highlightedSeatLabels?: string[];
+    zones: ZoneOccupancy[];
+    highlightedZone?: ZoneName;
     eventName: string;
-    pulseLabels?: string[];
+    pulseKeys?: string[];
     variant?: 'booking' | 'admin';
     startsAtRest?: boolean;
     onSeatHover?: (hover: SeatHover | null) => void;
+};
+
+type SpringValue = { value: number; velocity: number };
+
+type PointerState = {
+    normalized: { x: number; y: number };
+    localX: number;
+    localY: number;
+    isInside: boolean;
+    hasMoved: boolean;
+};
+
+type OrbitState = {
+    viewAngle: { yaw: number; elevation: number } | null;
+    tilt: { yaw: SpringValue; elevation: SpringValue };
+    tiltTarget: { x: number; y: number };
+    framing: ViewFraming;
+    framingKey: {
+        hall: HallLayout | null;
+        aspect: number;
+        fov: number;
+        yaw: number;
+        elevation: number;
+    };
+};
+
+type SeatFrame = {
+    mesh: InstancedMesh;
+    layout: SeatPlacement[];
+    seatColors: Color[];
+    time: number;
+    step: number;
+    isStill: boolean;
+    dirtyMatrices: number[];
+    dirtyColors: number[];
 };
 
 const RISE_SECONDS = 0.5;
@@ -81,10 +119,10 @@ const HOP_SECONDS = 0.6;
 const HOP_HEIGHT = 0.35;
 const GLOW_SECONDS = 1.2;
 const RIPPLE_SECONDS = 1;
-const EMPTY_LABELS: string[] = [];
+const EMPTY_KEYS: string[] = [];
 const MARKER_COLOR = '#fafafa';
-const HIGHLIGHT_FLASH = '#ffffff';
-const HIGHLIGHT_LIFT = 0.05;
+const HIGHLIGHT_TINT = 0.22;
+const HIGHLIGHT_TINT_PULSE = 0.18;
 const FALLBACK_FONT_FAMILY = 'system-ui, sans-serif';
 const TILT_FREQUENCY = 10;
 const HOVER_LIFT = 0.12;
@@ -92,14 +130,13 @@ const HOVER_EASE = 14;
 const HOVER_REST = 0.002;
 const LABEL_GAP = 12;
 const LABEL_INSET = 4;
-
 const scratchColor = new Color();
 const glowColor = new Color(SEAT_COLORS.glow);
-const highlightColor = new Color(SEAT_COLORS.checkedIn);
-const highlightFlashColor = new Color(HIGHLIGHT_FLASH);
 const cameraDirection: Point3 = [0, 0, 0];
 const raycaster = new Raycaster();
 const pointerNdc = new Vector2();
+
+type SeatPlacement = ReturnType<typeof computeSeatLayout>[number];
 
 function uploadInstances(
     attribute: InstancedBufferAttribute | null,
@@ -253,43 +290,6 @@ function useSeatMeshes(count: number, rowEnds: Point3[], isLowPower: boolean) {
     return { ...meshes, softDiscTexture: materials.softDiscTexture };
 }
 
-type SeatPlacement = ReturnType<typeof computeSeatLayout>[number];
-
-type SpringValue = { value: number; velocity: number };
-
-type PointerState = {
-    normalized: { x: number; y: number };
-    localX: number;
-    localY: number;
-    isInside: boolean;
-    hasMoved: boolean;
-};
-
-type OrbitState = {
-    viewAngle: { yaw: number; elevation: number } | null;
-    tilt: { yaw: SpringValue; elevation: SpringValue };
-    tiltTarget: { x: number; y: number };
-    framing: ViewFraming;
-    framingKey: {
-        hall: HallLayout | null;
-        aspect: number;
-        fov: number;
-        yaw: number;
-        elevation: number;
-    };
-};
-
-type SeatFrame = {
-    mesh: InstancedMesh;
-    layout: SeatPlacement[];
-    seatColors: Color[];
-    time: number;
-    step: number;
-    isStill: boolean;
-    dirtyMatrices: number[];
-    dirtyColors: number[];
-};
-
 function placeSeat(
     mesh: InstancedMesh,
     index: number,
@@ -439,28 +439,18 @@ function animatePulses(frame: SeatFrame, pulses: Map<number, number>) {
 function animateHighlight(
     frame: SeatFrame,
     highlightFocus: HighlightFocus,
-    isRising: boolean,
     riseEnd: number,
     marker: Mesh | null,
     markerMaterial: MeshBasicMaterial | null,
 ) {
     const { time, isStill } = frame;
-    const pulse = isStill ? 0 : 0.3 * Math.pow(0.5 + 0.5 * Math.sin(time * 4), 3);
-
-    scratchColor.copy(highlightColor).lerp(highlightFlashColor, pulse);
+    const tint =
+        HIGHLIGHT_TINT + (isStill ? 0 : HIGHLIGHT_TINT_PULSE * (0.5 + 0.5 * Math.sin(time * 2)));
 
     for (const index of highlightFocus.indices) {
+        scratchColor.copy(frame.seatColors[index]).lerp(glowColor, tint);
         frame.mesh.setColorAt(index, scratchColor);
         frame.dirtyColors.push(index);
-    }
-
-    if (!isRising) {
-        const lift = 1 + HIGHLIGHT_LIFT * (isStill ? 1 : 1 + Math.sin(time * 4));
-
-        for (const index of highlightFocus.indices) {
-            placeSeat(frame.mesh, index, frame.layout[index], 0, lift);
-            frame.dirtyMatrices.push(index);
-        }
     }
 
     const markerProgress = Math.min(1, Math.max(0, (time - riseEnd) / 0.5));
@@ -476,7 +466,6 @@ function updateHover(
     camera: PerspectiveCamera,
     pointer: PointerState,
     seatStates: Record<string, SeatState>,
-    ownSeatLabels: ReadonlySet<string>,
     onSeatHover?: (hover: SeatHover | null) => void,
 ): number {
     let hovered = -1;
@@ -497,11 +486,8 @@ function updateHover(
         return hovered;
     }
 
-    const { label } = frame.layout[hovered];
-    const status = seatStatus(label, seatStates, ownSeatLabels);
-
     onSeatHover?.({
-        text: `${label} · ${SEAT_STATUS_LABEL[status]}`,
+        text: seatHoverText(frame.layout[hovered], seatStates),
         x: pointer.localX,
         y: pointer.localY,
     });
@@ -615,27 +601,22 @@ function usePointerTilt(canvas: HTMLCanvasElement, isStill: boolean, invalidate:
 }
 
 function useHighlightFocus(
-    highlightedSeatLabels: string[],
+    highlightedZone: ZoneName | undefined,
     layout: SeatPlacement[],
     hallWidth: number,
 ) {
     const highlightFocus = useMemo(
         () =>
-            computeHighlightFocus(
-                highlightedSeatLabels,
-                layout,
-                hallWidth,
-                AUDITORIUM_CAMERA.highlightYaw,
-            ),
-        [highlightedSeatLabels, layout, hallWidth],
+            highlightedZone
+                ? computeHighlightFocus(
+                      zoneSeatKeys(layout, highlightedZone),
+                      layout,
+                      hallWidth,
+                      AUDITORIUM_CAMERA.highlightYaw,
+                  )
+                : null,
+        [highlightedZone, layout, hallWidth],
     );
-
-    const highlightIndices = useMemo(
-        () => new Set(highlightFocus?.indices ?? []),
-        [highlightFocus],
-    );
-
-    const ownSeatLabels = useMemo(() => new Set(highlightedSeatLabels), [highlightedSeatLabels]);
 
     const markerGeometry = useMemo(
         () =>
@@ -647,16 +628,14 @@ function useHighlightFocus(
 
     useEffect(() => () => markerGeometry?.dispose(), [markerGeometry]);
 
-    return { highlightFocus, highlightIndices, ownSeatLabels, markerGeometry };
+    return { highlightFocus, markerGeometry };
 }
 
 export function AuditoriumContents({
-    rows,
-    seatsPerRow,
-    seatStates,
-    highlightedSeatLabels = EMPTY_LABELS,
+    zones,
+    highlightedZone,
     eventName,
-    pulseLabels = EMPTY_LABELS,
+    pulseKeys = EMPTY_KEYS,
     variant = 'booking',
     onSeatHover,
     fontFamily,
@@ -670,7 +649,7 @@ export function AuditoriumContents({
     const elapsedRef = useRef(startsAtRest ? RESTING_START_SECONDS : 0);
     const isRisingRef = useRef(!isStill && !startsAtRest);
     const pulsesRef = useRef(new Map<number, number>());
-    const previousPulseLabelsRef = useRef(new Set(pulseLabels));
+    const previousPulseKeysRef = useRef(new Set(pulseKeys));
     const hoveredRef = useRef(-1);
     const fullUploadRef = useRef(true);
     const dirtyMatricesRef = useRef<number[]>([]);
@@ -688,19 +667,30 @@ export function AuditoriumContents({
     const { isLowPower } = useSceneQuality();
     const { pointerRef, tiltTargetRef } = usePointerTilt(canvas, isStill, invalidate);
 
-    const layout = useMemo(() => computeSeatLayout(rows, seatsPerRow), [rows, seatsPerRow]);
-    const hall = useMemo(() => computeHallLayout(rows, seatsPerRow), [rows, seatsPerRow]);
-    const rowEnds = useMemo(() => computeRowEnds(rows, seatsPerRow), [rows, seatsPerRow]);
+    const seating = useZoneSeating(zones);
+    const seatStates = useMemo(() => zoneSeatStates(zones), [zones]);
+    const layout = useMemo(() => computeSeatLayout(seating), [seating]);
+    const hall = useMemo(() => computeHallLayout(seating), [seating]);
+    const rowEnds = useMemo(() => computeRowEnds(seating).flat(), [seating]);
+
+    const zoneSigns = useMemo(
+        () =>
+            zoneSignPositions(layout).map((sign) => ({
+                ...sign,
+                isHighlighted: sign.zone === highlightedZone,
+            })),
+        [layout, highlightedZone],
+    );
     const seatMeshes = useSeatMeshes(layout.length, rowEnds, isLowPower);
     const rippleGeometry = useMemo(() => new RingGeometry(0.35, 0.42, 40), []);
 
-    const indexByLabel = useMemo(
-        () => new Map(layout.map((placement, index) => [placement.label, index])),
+    const indexByKey = useMemo(
+        () => new Map(layout.map((placement, index) => [placement.key, index])),
         [layout],
     );
 
-    const { highlightFocus, highlightIndices, ownSeatLabels, markerGeometry } = useHighlightFocus(
-        highlightedSeatLabels,
+    const { highlightFocus, markerGeometry } = useHighlightFocus(
+        highlightedZone,
         layout,
         hall.width,
     );
@@ -736,7 +726,7 @@ export function AuditoriumContents({
             checkedIn: new Color(SEAT_COLORS.checkedIn),
         };
 
-        return layout.map((placement) => palette[seatStates[placement.label] ?? 'available']);
+        return layout.map((placement) => palette[seatStates[placement.key] ?? 'available']);
     }, [layout, seatStates, variant]);
 
     useEffect(() => () => rippleGeometry.dispose(), [rippleGeometry]);
@@ -784,16 +774,16 @@ export function AuditoriumContents({
     }, [highlightFocus, layout, seatColors, seatMeshes, pointerRef, invalidate]);
 
     useEffect(() => {
-        const previousLabels = previousPulseLabelsRef.current;
-        previousPulseLabelsRef.current = new Set(pulseLabels);
+        const previousKeys = previousPulseKeysRef.current;
+        previousPulseKeysRef.current = new Set(pulseKeys);
 
         if (isStill) return;
 
         const group = ripplesRef.current;
 
-        for (const label of pulseLabels) {
-            const index = indexByLabel.get(label);
-            if (previousLabels.has(label) || index === undefined) continue;
+        for (const key of pulseKeys) {
+            const index = indexByKey.get(key);
+            if (previousKeys.has(key) || index === undefined) continue;
 
             pulsesRef.current.set(index, elapsedRef.current);
 
@@ -816,7 +806,7 @@ export function AuditoriumContents({
             ripple.userData.bornAt = elapsedRef.current;
             group.add(ripple);
         }
-    }, [pulseLabels, indexByLabel, layout, rippleGeometry, isStill]);
+    }, [pulseKeys, indexByKey, layout, rippleGeometry, isStill]);
 
     useFrame((state, delta) => {
         const mesh = seatsRef.current;
@@ -865,7 +855,6 @@ export function AuditoriumContents({
             animateHighlight(
                 frame,
                 highlightFocus,
-                isRisingRef.current,
                 riseTiming.end,
                 markerRef.current,
                 markerMaterialRef.current,
@@ -878,16 +867,12 @@ export function AuditoriumContents({
                 camera,
                 pointerRef.current,
                 seatStates,
-                ownSeatLabels,
                 onSeatHover,
             );
         }
 
         if (!isStill && !isRisingRef.current) {
-            animateHoverLifts(frame, hoverLiftRef.current, hoveredRef.current, [
-                highlightIndices,
-                pulsesRef.current,
-            ]);
+            animateHoverLifts(frame, hoverLiftRef.current, hoveredRef.current, [pulsesRef.current]);
         }
 
         ageRipples(rippleGroup, frame.time);
@@ -918,7 +903,8 @@ export function AuditoriumContents({
             />
 
             <AuditoriumHall
-                rows={rows}
+                rows={zoneRowCount(seating)}
+                zoneSigns={zoneSigns}
                 hall={hall}
                 eventName={eventName}
                 fontFamily={fontFamily}
@@ -990,10 +976,8 @@ export function Auditorium({
                 <SceneCanvas
                     fallback={
                         <AuditoriumFallback
-                            rows={props.rows}
-                            seatsPerRow={props.seatsPerRow}
-                            seatStates={props.seatStates}
-                            highlightedSeatLabels={props.highlightedSeatLabels}
+                            zones={props.zones}
+                            highlightedZone={props.highlightedZone}
                             eventName={props.eventName}
                             variant={props.variant}
                         />

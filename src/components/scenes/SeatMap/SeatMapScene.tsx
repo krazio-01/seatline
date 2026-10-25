@@ -1,45 +1,31 @@
 'use client';
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import './seatMap.scss';
 import { AuditoriumFallback } from '@/components/scenes/AuditoriumFallback/AuditoriumFallback';
 import { LazyAuditorium, useSceneGate } from '@/components/scenes/LazyScenes';
-import { bookedSeatStates } from '@/components/scenes/seatLayout';
 import { useAppContext } from '@/context/appContext';
-import { bookedSeatCount } from '@/utils/booking-form';
+import { ZONE_LABELS } from '@/types/booking';
 
-export function OwnSeatsLegendItem() {
-    const { ownSeats } = useAppContext('booking');
+export function OwnZoneLegendItem() {
+    const { ownBooking } = useAppContext('booking');
 
-    if (!ownSeats?.length) return null;
+    if (!ownBooking) return null;
 
     return (
-        <li className="seat-map-own-seats">
+        <li className="seat-map-own-zone">
             <i className="seat-map-swatch" data-state="yours" />
-            Your seats
+            Your zone: {ZONE_LABELS[ownBooking.zone]}
         </li>
     );
 }
 
-export function SeatMapScene({
-    rows,
-    seatsPerRow,
-    eventName,
-}: {
-    rows: number;
-    seatsPerRow: number;
-    eventName: string;
-}) {
-    const booking = useAppContext('booking');
-    const { ownSeats } = booking;
+export function SeatMapScene({ eventName }: { eventName: string }) {
+    const { zones, ownBooking } = useAppContext('booking');
     const sceneRef = useRef<HTMLDivElement>(null);
     const [isSceneReady, setIsSceneReady] = useState(false);
 
     const shouldLoadScene = useSceneGate(sceneRef);
-
-    const seatStates = useMemo(
-        () => bookedSeatStates(bookedSeatCount(booking), rows * seatsPerRow, seatsPerRow),
-        [booking, rows, seatsPerRow],
-    );
+    const highlightedZone = ownBooking?.zone;
 
     return (
         <div
@@ -49,19 +35,15 @@ export function SeatMapScene({
             data-scene-ready={isSceneReady || undefined}
         >
             <AuditoriumFallback
-                rows={rows}
-                seatsPerRow={seatsPerRow}
-                seatStates={seatStates}
-                highlightedSeatLabels={ownSeats}
+                zones={zones}
+                highlightedZone={highlightedZone}
                 eventName={eventName}
             />
 
             {shouldLoadScene && (
                 <LazyAuditorium
-                    rows={rows}
-                    seatsPerRow={seatsPerRow}
-                    seatStates={seatStates}
-                    highlightedSeatLabels={ownSeats}
+                    zones={zones}
+                    highlightedZone={highlightedZone}
                     eventName={eventName}
                     startsAtRest
                     onFirstFrame={() => setIsSceneReady(true)}

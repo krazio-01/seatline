@@ -7,6 +7,8 @@ export type SessionRole = 'admin' | 'checker';
 
 export type SessionPayload = { role: SessionRole; userId: string; sessionVersion: number };
 
+export type PhotoTokenClaims = { photoId: string; checkerId: string };
+
 export type SessionCookieOptions = {
     httpOnly: boolean;
     secure: boolean;
@@ -20,10 +22,14 @@ export const CHECKER_COOKIE = 'checker_session';
 export const ADMIN_SESSION_SECONDS = 8 * 60 * 60;
 export const CHECKER_SESSION_SECONDS = 12 * 60 * 60;
 export const SESSION_COOKIE_BY_ROLE = { admin: ADMIN_COOKIE, checker: CHECKER_COOKIE } as const;
-
 const ISSUER = 'event-booking';
 const ALGORITHM = 'HS256';
 const MIN_SECRET_BYTES = 32;
+const TOKEN_PATTERN = /^[A-Za-z0-9_-]{22}$/;
+const EMAIL_PROOF_AUDIENCE = 'email-proof';
+const PHOTO_TOKEN_AUDIENCE = 'aadhaar-photo';
+export const PHOTO_TOKEN_SECONDS = 5 * 60;
+export const EMAIL_PROOF_SECONDS = 60 * 60;
 
 function getSigningKey(): Uint8Array {
     const key = new TextEncoder().encode(getEnv().SESSION_SECRET);
@@ -86,8 +92,6 @@ export function sessionCookieOptions(maxAgeSeconds: number): SessionCookieOption
     };
 }
 
-const TOKEN_PATTERN = /^[A-Za-z0-9_-]{22}$/;
-
 export function generateQrToken(): string {
     return randomBytes(16).toString('base64url');
 }
@@ -95,9 +99,6 @@ export function generateQrToken(): string {
 export function isWellFormedQrToken(value: string): boolean {
     return TOKEN_PATTERN.test(value);
 }
-
-const EMAIL_PROOF_AUDIENCE = 'email-proof';
-export const EMAIL_PROOF_SECONDS = 60 * 60;
 
 export async function signEmailProof(email: string): Promise<string> {
     const issuedAt = Math.floor(Date.now() / 1000);
@@ -124,6 +125,40 @@ export async function verifyEmailProof(token: string): Promise<string | null> {
         });
 
         return typeof payload.email === 'string' ? payload.email : null;
+    } catch {
+        return null;
+    }
+}
+
+export async function signPhotoToken(claims: PhotoTokenClaims): Promise<string> {
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = new SignJWT({
+        ...claims,
+        iss: ISSUER,
+        aud: PHOTO_TOKEN_AUDIENCE,
+        iat: issuedAt,
+        exp: issuedAt + PHOTO_TOKEN_SECONDS,
+    });
+    token.setProtectedHeader({ alg: ALGORITHM });
+
+    return token.sign(getSigningKey());
+}
+
+export async function verifyPhotoToken(token: string): Promise<PhotoTokenClaims | null> {
+    const key = getSigningKey();
+
+    try {
+        const { payload } = await jwtVerify(token, key, {
+            algorithms: [ALGORITHM],
+            audience: PHOTO_TOKEN_AUDIENCE,
+            issuer: ISSUER,
+        });
+
+        if (typeof payload.photoId !== 'string' || typeof payload.checkerId !== 'string') {
+            return null;
+        }
+
+        return { photoId: payload.photoId, checkerId: payload.checkerId };
     } catch {
         return null;
     }

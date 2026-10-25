@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/ui/EmptyState/EmptyState';
 import './searchMenu.scss';
 import { api } from '@/services/client/api';
 import type { BookingRow } from '@/types/admin';
+import { ZONE_LABELS } from '@/types/booking';
 import { ADMIN_PAGES, ADMIN_ROOT_HREF } from '@/components/layout/navigation';
 
 type BookingResults = { query: string; items: BookingRow[]; errorMessage?: string };
@@ -21,7 +22,7 @@ const SEARCH_DEBOUNCE_MS = 250;
 const BOOKING_RESULT_LIMIT = 5;
 
 function describeBooking(booking: BookingRow): string {
-    const parts = [booking.studentGroup, booking.guests[0]?.name, booking.seats.join(', ')];
+    const parts = [booking.studentGroup, booking.guests[0]?.name, ZONE_LABELS[booking.zone]];
     const filledParts = parts.filter((part): part is string => Boolean(part));
 
     return filledParts.join(' · ');

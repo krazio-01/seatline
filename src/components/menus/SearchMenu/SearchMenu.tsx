@@ -6,12 +6,14 @@ import './searchMenu.scss';
 import { Hotkey } from '@/components/ui/Hotkey/Hotkey';
 import { useClientValue } from '@/hooks/useHydrated';
 
-const loadSearchDialog = () =>
-    import('@/components/menus/SearchMenu/SearchDialog').then((module) => module.SearchDialog);
-
 const SearchDialog = dynamic(loadSearchDialog, { ssr: false });
-
 const APPLE_PLATFORM_PATTERN = /mac|iphone|ipad/i;
+
+function loadSearchDialog() {
+    return import('@/components/menus/SearchMenu/SearchDialog').then(
+        (module) => module.SearchDialog,
+    );
+}
 
 function isApplePlatform(): boolean {
     const { userAgentData } = navigator as Navigator & { userAgentData?: { platform: string } };

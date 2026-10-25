@@ -45,8 +45,8 @@ export function Hero({
 
                 <p className="hero-lead">
                     Reserve seats for up to {maxGuestsPerBooking}{' '}
-                    {pluralize(maxGuestsPerBooking, 'guest')}. Your seats are picked together and
-                    your QR pass arrives by email.
+                    {pluralize(maxGuestsPerBooking, 'guest')}. Your party sits together in one zone
+                    and your QR pass arrives by email.
                 </p>
             </div>
         </header>

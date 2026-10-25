@@ -1,5 +1,7 @@
 'use client';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import {
     CheckIcon,
     CircleAlertIcon,
@@ -10,11 +12,13 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 import './scanResult.scss';
+import type { CardPhoto } from '@/components/dialogs/CardPhotoDialog/CardPhotoDialog';
 import { Button } from '@/components/ui/Button/Button';
 import { StatTiles } from '@/components/widgets/StatTiles/StatTiles';
 import { useAppContext, useUpdateAppContext } from '@/context/appContext';
 import { INITIAL_SCANNER, type CheckInCounts, type ScannerState } from '@/context/appStore';
-import type { CheckInResult } from '@/types/booking';
+import { api } from '@/services/client/api';
+import { ZONE_LABELS, type CheckInGuest, type CheckInResult } from '@/types/booking';
 import { formatDate } from '@/utils/dates';
 import { pluralize } from '@/utils/text';
 
@@ -22,7 +26,13 @@ export type ScanOutcome = 'ok' | 'used' | 'bad';
 
 type ScanCardState = ScanOutcome | 'checking' | 'error';
 
-type ScanDetail = { label: string; value: ReactNode; isWide?: boolean; isMono?: boolean };
+type ScanDetail = {
+    label: string;
+    value: ReactNode;
+    isWide?: boolean;
+    isMono?: boolean;
+    isProminent?: boolean;
+};
 
 type ScanCopy = { title: string; subtitle: string; details: ScanDetail[] };
 
@@ -44,18 +54,69 @@ const TALLY_LABELS: Record<CheckInResult['outcome'], string> = {
     invalid: 'Invalid',
 };
 
+const THUMBNAIL_SIZE = { width: 56, height: 36 };
 const SINGLE_PULSE_MS = 60;
 const WARNING_PULSE_MS = [80, 60, 80];
 const COUNTS_STORAGE_PREFIX = 'scanner-counts:';
 
-function readStoredCounts(storageKey: string): CheckInCounts | null {
-    try {
-        const stored = sessionStorage.getItem(storageKey);
+const CardPhotoDialog = dynamic(
+    () =>
+        import('@/components/dialogs/CardPhotoDialog/CardPhotoDialog').then(
+            (module) => module.CardPhotoDialog,
+        ),
+    { ssr: false },
+);
 
-        return stored ? { ...INITIAL_SCANNER.counts, ...JSON.parse(stored) } : null;
-    } catch {
-        return null;
-    }
+function GuestCards({ guests }: { guests: CheckInGuest[] }) {
+    const [openPhoto, setOpenPhoto] = useState<CardPhoto | null>(null);
+    const [hasOpened, setHasOpened] = useState(false);
+
+    const showPhoto = (photo: CardPhoto) => {
+        setHasOpened(true);
+        setOpenPhoto(photo);
+    };
+
+    return (
+        <>
+            <ul className="scan-result-guests">
+                {guests.map((guest, index) => {
+                    const src = guest.photoToken
+                        ? api.aadhaarPhotos.maskedUrl(guest.photoToken)
+                        : null;
+
+                    return (
+                        <li key={index} className="scan-result-guest">
+                            {src ? (
+                                <button
+                                    type="button"
+                                    className="scan-result-guest-photo"
+                                    aria-label={`Show the card photo of ${guest.name}`}
+                                    onClick={() => showPhoto({ name: guest.name, src })}
+                                >
+                                    <Image
+                                        src={src}
+                                        alt=""
+                                        width={THUMBNAIL_SIZE.width}
+                                        height={THUMBNAIL_SIZE.height}
+                                        unoptimized
+                                        loading="eager"
+                                        draggable={false}
+                                    />
+                                </button>
+                            ) : (
+                                <span className="scan-result-guest-photo" data-empty="true">
+                                    No photo
+                                </span>
+                            )}
+                            <span className="scan-result-guest-name">{guest.name}</span>
+                        </li>
+                    );
+                })}
+            </ul>
+
+            {hasOpened && <CardPhotoDialog photo={openPhoto} onClose={() => setOpenPhoto(null)} />}
+        </>
+    );
 }
 
 function writeStoredCounts(storageKey: string, counts: CheckInCounts) {
@@ -81,15 +142,10 @@ function describeResult(result: CheckInResult): ScanCopy {
         };
     }
 
-    const seats = (
-        <span className="scan-result-seats">
-            {result.seats.map((seat) => (
-                <i key={seat} className="scan-result-seat">
-                    {seat}
-                </i>
-            ))}
-        </span>
-    );
+    const zoneDetails: ScanDetail[] = [
+        { label: 'Zone', value: result.zone, isProminent: true },
+        { label: 'Seats', value: result.seatCount, isProminent: true },
+    ];
 
     if (result.outcome === 'already_checked_in') {
         const checkedInAt = result.checkedInAt
@@ -100,8 +156,13 @@ function describeResult(result: CheckInResult): ScanCopy {
             title: 'Already checked in',
             subtitle: `Checked in${checkedInAt} by ${result.checkedInByName ?? 'another checker'}`,
             details: [
-                { label: 'Student', value: result.studentName },
-                { label: 'Seats', value: seats },
+                ...zoneDetails,
+                { label: 'Student', value: result.studentName, isWide: true },
+                {
+                    label: pluralize(result.guests.length, 'Guest'),
+                    value: <GuestCards guests={result.guests} />,
+                    isWide: true,
+                },
                 {
                     label: 'What to do',
                     value: 'Do not allow entry again. Ask the guest to speak to the event organizers.',
@@ -118,15 +179,15 @@ function describeResult(result: CheckInResult): ScanCopy {
         title: `Allow entry · ${guestCount} ${pluralize(guestCount, 'guest')}`,
         subtitle: 'Checked in just now',
         details: [
+            ...zoneDetails,
             { label: 'Student', value: result.studentName },
             { label: 'Group', value: result.studentGroup },
-            { label: 'Seats', value: seats },
             ...(leadAadhaar
                 ? [{ label: 'Guest 1 Aadhaar', value: leadAadhaar, isMono: true }]
                 : []),
             {
                 label: pluralize(guestCount, 'Guest'),
-                value: result.guests.map((guest) => guest.name).join(', '),
+                value: <GuestCards guests={result.guests} />,
                 isWide: true,
             },
         ],
@@ -186,6 +247,7 @@ function ScanResultBody({ result, error, isChecking }: ScannerState) {
                         <dd
                             className="scan-result-detail-value"
                             data-mono={detail.isMono || undefined}
+                            data-prominent={detail.isProminent || undefined}
                         >
                             {detail.value}
                         </dd>
@@ -196,20 +258,35 @@ function ScanResultBody({ result, error, isChecking }: ScannerState) {
     );
 }
 
-function describeAnnouncement({ result, error, isChecking }: ScannerState): string {
-    if (isChecking) return 'Checking pass';
-
-    if (error) return 'Could not check this pass, scan again';
-
-    return result ? describeResult(result).title : '';
-}
-
 function readCardState({ result, error, isChecking }: ScannerState): ScanCardState | undefined {
     if (isChecking) return 'checking';
 
     if (error) return 'error';
 
     return result ? toScanOutcome(result) : undefined;
+}
+
+export function describeAnnouncement({ result, error, isChecking }: ScannerState): string {
+    if (isChecking) return 'Checking pass';
+
+    if (error) return 'Could not check this pass, scan again';
+
+    if (!result) return '';
+
+    const { title } = describeResult(result);
+    if (result.outcome !== 'checked_in') return title;
+
+    return `${title} · ${ZONE_LABELS[result.zone]}, ${result.seatCount} ${pluralize(result.seatCount, 'seat')}`;
+}
+
+export function readStoredCounts(storageKey: string): CheckInCounts | null {
+    try {
+        const stored = sessionStorage.getItem(storageKey);
+
+        return stored ? { ...INITIAL_SCANNER.counts, ...JSON.parse(stored) } : null;
+    } catch {
+        return null;
+    }
 }
 
 export function toScanOutcome(result: CheckInResult): ScanOutcome {

@@ -16,6 +16,8 @@ import { pluralize } from '@/utils/text';
 
 type ImportStage = 'idle' | 'reading' | 'uploading' | 'done';
 
+type ImportLimits = { maxRows: number; maxCsvLength: number };
+
 const BYTES_PER_MEGABYTE = 1_000_000;
 
 const STAGE_PROGRESS: Record<ImportStage, number> = {
@@ -31,8 +33,6 @@ const STAGE_LABELS: Record<ImportStage, string> = {
     uploading: 'Importing students…',
     done: 'Import finished',
 };
-
-type ImportLimits = { maxRows: number; maxCsvLength: number };
 
 function checkFile(file: File, maxBytes: number): string | undefined {
     if (!/\.csv$/i.test(file.name)) return 'Choose a .csv file.';

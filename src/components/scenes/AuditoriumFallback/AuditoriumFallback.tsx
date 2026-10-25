@@ -20,19 +20,23 @@ import {
     SEAT_COLORS,
     SEAT_SPACING,
     seatStatus,
+    zoneRowCount,
+    zoneSeatKeys,
+    zoneSeatStates,
+    zoneSignPositions,
     type HallLayout,
     type Point3,
-    type SeatState,
     type SeatStatus,
 } from '@/components/scenes/seatLayout';
+import { useZoneSeating } from '@/hooks/useZoneSeating';
+import { ZONE_LABELS, type ZoneName, type ZoneOccupancy } from '@/types/booking';
 
 type DrawingSize = { width: number; height: number };
 
 type HallDrawingInput = {
-    rows: number;
-    seatsPerRow: number;
-    seatStates: Record<string, SeatState>;
-    highlightedSeatLabels: string[];
+    seating: { name: ZoneName; capacity: number }[];
+    zones: ZoneOccupancy[];
+    highlightedZone: ZoneName | undefined;
     eventName: string;
     variant: 'booking' | 'admin';
     size: DrawingSize;
@@ -40,7 +44,9 @@ type HallDrawingInput = {
 };
 
 const REFERENCE_SIZE: DrawingSize = { width: 600, height: 400 };
-const EMPTY_LABELS: string[] = [];
+const EMPTY_ZONES: ZoneOccupancy[] = [];
+const ZONE_SIGN_HEIGHT = 0.65;
+const ZONE_SIGN_FONT_RATIO = 130 / 256;
 const RUNNER_LIFT = 0.012;
 const FLOOR_THICKNESS = 0.2;
 const SCREEN_LABEL = { textureHeight: 512, fontSize: 190, padding: 124, textureWidth: 2048 };
@@ -201,23 +207,26 @@ function chairPolygons(projection: OrbitProjection): { shape: string; tone: stri
 }
 
 function drawHall({
-    rows,
-    seatsPerRow,
-    seatStates,
-    highlightedSeatLabels,
+    seating,
+    zones,
+    highlightedZone,
     eventName,
     variant,
     size,
     idPrefix,
 }: HallDrawingInput): ReactNode[] {
-    const hall: HallLayout = computeHallLayout(rows, seatsPerRow);
-    const layout = computeSeatLayout(rows, seatsPerRow);
-    const highlightFocus = computeHighlightFocus(
-        highlightedSeatLabels,
-        layout,
-        hall.width,
-        AUDITORIUM_CAMERA.highlightYaw,
-    );
+    const rows = zoneRowCount(seating);
+    const hall: HallLayout = computeHallLayout(seating);
+    const layout = computeSeatLayout(seating);
+    const seatStates = zoneSeatStates(zones);
+    const highlightFocus = highlightedZone
+        ? computeHighlightFocus(
+              zoneSeatKeys(layout, highlightedZone),
+              layout,
+              hall.width,
+              AUDITORIUM_CAMERA.highlightYaw,
+          )
+        : null;
     const view = auditoriumRestView(highlightFocus?.yaw ?? null);
     const projection = createOrbitProjection(
         {
@@ -237,7 +246,6 @@ function drawHall({
     const floorBack = floor.z + floor.depth / 2;
     const stageBack = floor.z - floor.depth / 2;
     const topHeight = (rows - 1) * ROW_RISE;
-    const ownSeatLabels = new Set(highlightedSeatLabels);
     const gradient = (name: string) => `url(#${idPrefix}-${name})`;
     const elements: ReactNode[] = [];
 
@@ -245,7 +253,6 @@ function drawHall({
         available: SEAT_COLORS.available,
         booked: variant === 'admin' ? SEAT_COLORS.adminBooked : SEAT_COLORS.booked,
         checkedIn: SEAT_COLORS.checkedIn,
-        own: SEAT_COLORS.checkedIn,
     };
 
     const add = (key: string, element: ReactNode) =>
@@ -488,8 +495,26 @@ function drawHall({
 
     const chairs = chairPolygons(projection);
     const rowSymbols: ReactNode[] = [];
-    const rowEnds = computeRowEnds(rows, seatsPerRow);
-    const endsPerRow = rowEnds.length / rows;
+    const rowEnds = computeRowEnds(seating);
+
+    zoneSignPositions(layout).forEach(({ zone, position }) => {
+        const center = projection.project(position);
+        const scale = projection.pixelsPerUnit(center.depth);
+
+        add(
+            `zone-sign-${zone}`,
+            <text
+                className="auditorium-fallback-zone-sign"
+                data-zone={zone}
+                data-highlighted={zone === highlightedZone ? 'true' : undefined}
+                x={roundTo(center.x, 1)}
+                y={roundTo(center.y, 1)}
+                fontSize={roundTo(ZONE_SIGN_HEIGHT * ZONE_SIGN_FONT_RATIO * scale, 1)}
+            >
+                {ZONE_LABELS[zone]}
+            </text>,
+        );
+    });
     const markerRow = highlightFocus
         ? Math.min(
               rows - 1,
@@ -566,14 +591,17 @@ function drawHall({
                 'marker',
                 <polygon
                     points={polygon(projection, ring)}
+                    data-zone={highlightedZone}
                     className="auditorium-fallback-marker"
                     strokeWidth={roundTo(MARKER_WIDTH * projection.pixelsPerUnit(markerDepth), 2)}
                 />,
             );
         }
 
-        const endPanels = rowEnds.slice(row * endsPerRow, (row + 1) * endsPerRow);
+        const endPanels = rowEnds[row] ?? [];
         const rowSeats = layout.filter((placement) => placement.row === row);
+        if (rowSeats.length === 0) continue;
+
         const middleSeat = rowSeats[Math.floor(rowSeats.length / 2)];
         const rowDepth = projection.project([middleSeat.x, middleSeat.y, middleSeat.z]).depth;
 
@@ -602,12 +630,12 @@ function drawHall({
                     />
                 ))}
                 {rowSeats.map((placement) => {
-                    const status = seatStatus(placement.label, seatStates, ownSeatLabels);
+                    const status = seatStatus(placement.key, seatStates);
                     const origin = projection.project([placement.x, placement.y, placement.z]);
 
                     return (
                         <use
-                            key={placement.label}
+                            key={placement.key}
                             href={`#${idPrefix}r${row}`}
                             x={roundTo(origin.x, 1)}
                             y={roundTo(origin.y, 1)}
@@ -678,18 +706,14 @@ function drawHall({
 }
 
 export function AuditoriumFallback({
-    rows,
-    seatsPerRow,
-    seatStates = {},
-    highlightedSeatLabels = EMPTY_LABELS,
+    zones = EMPTY_ZONES,
+    highlightedZone,
     eventName = '',
     variant = 'booking',
     className,
 }: {
-    rows: number;
-    seatsPerRow: number;
-    seatStates?: Record<string, SeatState>;
-    highlightedSeatLabels?: string[];
+    zones?: ZoneOccupancy[];
+    highlightedZone?: ZoneName;
     eventName?: string;
     variant?: 'booking' | 'admin';
     className?: string;
@@ -714,19 +738,20 @@ export function AuditoriumFallback({
         return () => observer.disconnect();
     }, []);
 
+    const seating = useZoneSeating(zones);
+
     const drawing = useMemo(
         () =>
             drawHall({
-                rows,
-                seatsPerRow,
-                seatStates,
-                highlightedSeatLabels,
+                seating,
+                zones,
+                highlightedZone,
                 eventName,
                 variant,
                 size,
                 idPrefix,
             }),
-        [rows, seatsPerRow, seatStates, highlightedSeatLabels, eventName, variant, size, idPrefix],
+        [seating, zones, highlightedZone, eventName, variant, size, idPrefix],
     );
 
     return (

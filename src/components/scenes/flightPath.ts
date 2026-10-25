@@ -34,13 +34,8 @@ export const SMOKE = {
 };
 
 export const JET_RADIUS = 2.3;
-
 const WIDE_BAND = { top: 0.9, bottom: -0.3 };
 const PORTRAIT_BAND = { top: 0.9, bottom: 0.15 };
-
-export function flightBand(aspect: number): { top: number; bottom: number } {
-    return aspect < 1 ? PORTRAIT_BAND : WIDE_BAND;
-}
 
 export const FLIGHT_ENVELOPE = Math.max(
     JET_RADIUS,
@@ -60,6 +55,10 @@ function lerp(from: number, to: number, amount: number): number {
 
 function envelopeOnScreen(depth: number, tanVertical: number): number {
     return (FLIGHT_ENVELOPE * PERSPECTIVE_ALLOWANCE) / (depth * tanVertical);
+}
+
+export function flightBand(aspect: number): { top: number; bottom: number } {
+    return aspect < 1 ? PORTRAIT_BAND : WIDE_BAND;
 }
 
 export function planFlight(random: () => number, view: FlightView): FlightPlan {

@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/Button/Button';
 import { EmptyState } from '@/components/ui/EmptyState/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton/Skeleton';
 import type { StudentOption } from '@/types/booking';
-import { formatStudentGroupAndId } from '@/utils/booking-form';
 
 export type StudentsState =
     | { status: 'loading' }
@@ -90,14 +89,14 @@ export function StudentPicker({
                                 {studentsState.students.map((student) => (
                                     <CommandItem
                                         key={student.id}
-                                        value={`${student.name} ${student.group} ${student.idNumber} ${student.id}`}
+                                        value={`${student.name} ${student.group} ${student.id}`}
                                         data-checked={selectedStudentId === student.id}
                                         onSelect={() => onChoose(student)}
                                     >
                                         <span className="student-picker-option">
                                             {student.name}
                                             <span className="student-picker-meta">
-                                                {formatStudentGroupAndId(student)}
+                                                Group {student.group}
                                             </span>
                                         </span>
                                     </CommandItem>

@@ -21,20 +21,6 @@ import {
     type HallLayout,
 } from '@/components/scenes/seatLayout';
 
-export const DETAILED_SEAT_LIMIT = 1500;
-
-const { backrest } = CHAIR_PROFILE;
-
-export const scratchObject = new Object3D();
-
-const MINIMUM_LABEL_FONT_SIZE = 24;
-
-const CARPET_TILE_SIZE = 3;
-const RUNNER_LIFT = 0.012;
-const CARPET_COLOR = new Color('#82828a');
-const PLINTH_TOP_COLOR = new Color('#3f3f46');
-const PLINTH_BOTTOM_COLOR = new Color('#1c1c20');
-
 type LabelTextureOptions = {
     text: string;
     width: number;
@@ -45,23 +31,27 @@ type LabelTextureOptions = {
     spacing: number;
     maxTextWidth: number;
     fontFamily: string;
+    glowColor?: string;
 };
 
-export function fitLabelFontSize(
-    text: string,
-    maxWidth: number,
-    baseSize: number,
-    measure: (text: string, size: number) => number,
-): number {
-    const largestSize = Math.floor(baseSize);
-    const smallestSize = Math.min(largestSize, MINIMUM_LABEL_FONT_SIZE);
+type SlabOptions = {
+    width: number;
+    height: number;
+    depth: number;
+    radius: number;
+    curve: number;
+    spans?: number;
+};
 
-    for (let size = largestSize; size > smallestSize; size -= 1) {
-        if (measure(text, size) <= maxWidth) return size;
-    }
-
-    return smallestSize;
-}
+export const DETAILED_SEAT_LIMIT = 1500;
+const { backrest } = CHAIR_PROFILE;
+export const scratchObject = new Object3D();
+const MINIMUM_LABEL_FONT_SIZE = 24;
+const CARPET_TILE_SIZE = 3;
+const RUNNER_LIFT = 0.012;
+const CARPET_COLOR = new Color('#82828a');
+const PLINTH_TOP_COLOR = new Color('#3f3f46');
+const PLINTH_BOTTOM_COLOR = new Color('#1c1c20');
 
 function placed(geometry: BufferGeometry, x: number, y: number, z: number, tilt = 0) {
     if (tilt) geometry.rotateX(tilt);
@@ -120,9 +110,92 @@ function createCanvas(width: number, height: number) {
     return { canvas, context: canvas.getContext('2d')! };
 }
 
+function roundedSlab({ width, height, depth, radius, curve, spans = 1 }: SlabOptions) {
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
+    const straight = width - radius * 2;
+    const outline = new Shape();
+
+    outline.moveTo(-halfWidth + radius, -halfHeight);
+
+    for (let span = 1; span <= spans; span += 1) {
+        outline.lineTo(-halfWidth + radius + (straight * span) / spans, -halfHeight);
+    }
+
+    outline.quadraticCurveTo(halfWidth, -halfHeight, halfWidth, -halfHeight + radius);
+    outline.lineTo(halfWidth, halfHeight - radius);
+    outline.quadraticCurveTo(halfWidth, halfHeight, halfWidth - radius, halfHeight);
+
+    for (let span = 1; span <= spans; span += 1) {
+        outline.lineTo(halfWidth - radius - (straight * span) / spans, halfHeight);
+    }
+
+    outline.quadraticCurveTo(-halfWidth, halfHeight, -halfWidth, halfHeight - radius);
+    outline.lineTo(-halfWidth, -halfHeight + radius);
+    outline.quadraticCurveTo(-halfWidth, -halfHeight, -halfWidth + radius, -halfHeight);
+
+    const slab = new ExtrudeGeometry(outline, {
+        depth,
+        bevelEnabled: false,
+        curveSegments: curve,
+    });
+
+    return slab.translate(0, 0, -depth / 2);
+}
+
+function sideProfileSlab(options: SlabOptions) {
+    const slab = roundedSlab({ ...options, width: options.depth, depth: options.width });
+
+    return slab.rotateY(Math.PI / 2);
+}
+
+function bent(geometry: BufferGeometry, bend: number): BufferGeometry {
+    const positions = geometry.getAttribute('position');
+
+    for (let vertex = 0; vertex < positions.count; vertex += 1) {
+        const x = positions.getX(vertex);
+        positions.setZ(vertex, positions.getZ(vertex) - bend * x * x);
+    }
+
+    return geometry;
+}
+
+function onBackrest(geometry: BufferGeometry, offsetY: number, offsetZ: number) {
+    geometry.translate(0, offsetY, offsetZ);
+    geometry.rotateX(backrest.tilt);
+
+    return geometry.translate(0, backrest.y, backrest.z);
+}
+
+export function fitLabelFontSize(
+    text: string,
+    maxWidth: number,
+    baseSize: number,
+    measure: (text: string, size: number) => number,
+): number {
+    const largestSize = Math.floor(baseSize);
+    const smallestSize = Math.min(largestSize, MINIMUM_LABEL_FONT_SIZE);
+
+    for (let size = largestSize; size > smallestSize; size -= 1) {
+        if (measure(text, size) <= maxWidth) return size;
+    }
+
+    return smallestSize;
+}
+
 export function createLabelTexture(options: LabelTextureOptions): CanvasTexture {
-    const { text, width, height, background, color, size, spacing, maxTextWidth, fontFamily } =
-        options;
+    const {
+        text,
+        width,
+        height,
+        background,
+        color,
+        size,
+        spacing,
+        maxTextWidth,
+        fontFamily,
+        glowColor = '#1c1c22',
+    } = options;
     const { canvas, context } = createCanvas(width, height);
 
     context.letterSpacing = `${spacing}em`;
@@ -141,7 +214,7 @@ export function createLabelTexture(options: LabelTextureOptions): CanvasTexture 
         height / 2,
         width / 2,
     );
-    glow.addColorStop(0, '#1c1c22');
+    glow.addColorStop(0, glowColor);
     glow.addColorStop(1, background);
 
     context.fillStyle = glow;
@@ -221,72 +294,6 @@ export function createSoftDiscTexture(): CanvasTexture {
     context.fillRect(0, 0, size, size);
 
     return new CanvasTexture(canvas);
-}
-
-type SlabOptions = {
-    width: number;
-    height: number;
-    depth: number;
-    radius: number;
-    curve: number;
-    spans?: number;
-};
-
-function roundedSlab({ width, height, depth, radius, curve, spans = 1 }: SlabOptions) {
-    const halfWidth = width / 2;
-    const halfHeight = height / 2;
-    const straight = width - radius * 2;
-    const outline = new Shape();
-
-    outline.moveTo(-halfWidth + radius, -halfHeight);
-
-    for (let span = 1; span <= spans; span += 1) {
-        outline.lineTo(-halfWidth + radius + (straight * span) / spans, -halfHeight);
-    }
-
-    outline.quadraticCurveTo(halfWidth, -halfHeight, halfWidth, -halfHeight + radius);
-    outline.lineTo(halfWidth, halfHeight - radius);
-    outline.quadraticCurveTo(halfWidth, halfHeight, halfWidth - radius, halfHeight);
-
-    for (let span = 1; span <= spans; span += 1) {
-        outline.lineTo(halfWidth - radius - (straight * span) / spans, halfHeight);
-    }
-
-    outline.quadraticCurveTo(-halfWidth, halfHeight, -halfWidth, halfHeight - radius);
-    outline.lineTo(-halfWidth, -halfHeight + radius);
-    outline.quadraticCurveTo(-halfWidth, -halfHeight, -halfWidth + radius, -halfHeight);
-
-    const slab = new ExtrudeGeometry(outline, {
-        depth,
-        bevelEnabled: false,
-        curveSegments: curve,
-    });
-
-    return slab.translate(0, 0, -depth / 2);
-}
-
-function sideProfileSlab(options: SlabOptions) {
-    const slab = roundedSlab({ ...options, width: options.depth, depth: options.width });
-
-    return slab.rotateY(Math.PI / 2);
-}
-
-function bent(geometry: BufferGeometry, bend: number): BufferGeometry {
-    const positions = geometry.getAttribute('position');
-
-    for (let vertex = 0; vertex < positions.count; vertex += 1) {
-        const x = positions.getX(vertex);
-        positions.setZ(vertex, positions.getZ(vertex) - bend * x * x);
-    }
-
-    return geometry;
-}
-
-function onBackrest(geometry: BufferGeometry, offsetY: number, offsetZ: number) {
-    geometry.translate(0, offsetY, offsetZ);
-    geometry.rotateX(backrest.tilt);
-
-    return geometry.translate(0, backrest.y, backrest.z);
 }
 
 export function createChairGeometries(isDetailed: boolean) {

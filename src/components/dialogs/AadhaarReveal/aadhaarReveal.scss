@@ -9,13 +9,25 @@
         list-style: none;
 
         .aadhaar-reveal-guest {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
+            display: grid;
+            gap: 10px;
             padding: 10px 12px;
             border-radius: $radius-md;
             background: $color-muted;
+
+            .aadhaar-reveal-guest-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 16px;
+            }
+
+            .aadhaar-reveal-photo {
+                width: 100%;
+                height: auto;
+                border-radius: $radius-sm;
+                background: $color-background;
+            }
 
             .aadhaar-reveal-name {
                 min-width: 0;
@@ -36,6 +48,20 @@
                 color: $color-muted-foreground;
                 font-size: 0.8125rem;
             }
+        }
+    }
+
+    .aadhaar-reveal-confirm {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+
+        .aadhaar-reveal-confirm-text {
+            flex: 1 1 100%;
+            color: $color-destructive-text;
+            font-size: 0.8125rem;
         }
     }
 }
