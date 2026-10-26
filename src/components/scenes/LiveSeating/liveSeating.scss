@@ -1,0 +1,216 @@
+@use 'tokens' as *;
+
+.live-seating {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+
+    @media (min-width: $breakpoint-lg) {
+        position: sticky;
+        top: 24px;
+    }
+
+    .live-seating-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px 16px;
+    }
+
+    .live-seating-title {
+        margin: 0;
+        color: $color-foreground;
+        font-size: 0.875rem;
+        font-weight: 600;
+
+        .live-seating-place {
+            color: $color-muted-foreground;
+            font-weight: 400;
+        }
+    }
+
+    .live-seating-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 14px;
+        margin: 0;
+        padding: 0;
+        color: $color-body-text;
+        font-size: 0.8125rem;
+        list-style: none;
+
+        li {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+    }
+
+    .live-seating-swatch {
+        width: 9px;
+        height: 9px;
+        border-radius: 2px;
+
+        &[data-state='free'] {
+            border: 1px solid $color-border-strong;
+            background: $color-background;
+        }
+
+        &[data-state='booked'] {
+            background: $color-secondary-foreground;
+        }
+
+        &[data-state='own'] {
+            border: 1px solid $color-border;
+            background: $gradient-tricolour;
+        }
+    }
+
+    .live-seating-stage {
+        position: relative;
+        height: clamp(280px, 42vh, 440px);
+        overflow: hidden;
+
+        .live-seating-poster,
+        .live-seating-scene {
+            mask-image:
+                linear-gradient(to right, transparent, #000 7%, #000 93%, transparent),
+                linear-gradient(to bottom, transparent, #000 7%, #000 93%, transparent);
+            mask-composite: intersect;
+        }
+
+        .live-seating-poster {
+            object-fit: cover;
+            object-position: center;
+            transition: opacity 400ms $ease-out;
+            pointer-events: none;
+        }
+
+        .live-seating-scene {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            transition: opacity 400ms $ease-out;
+
+            canvas {
+                touch-action: pan-y;
+            }
+        }
+
+        .live-seating-grabbable {
+            cursor: grab;
+        }
+
+        .live-seating-dragging {
+            cursor: grabbing;
+        }
+    }
+
+    &[data-scene-ready] .live-seating-stage:has(canvas) {
+        .live-seating-poster {
+            opacity: 0;
+        }
+
+        .live-seating-scene {
+            opacity: 1;
+        }
+    }
+
+    .live-seating-callout {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: max-content;
+        max-width: 260px;
+        margin: 0;
+        padding: 10px 14px;
+        border: 1px solid rgb(255 255 255 / 0.95);
+        border-radius: 14px;
+        background: rgb(255 255 255 / 0.94);
+        box-shadow: 0 24px 60px -24px rgb(9 9 11 / 0.4);
+        color: $color-foreground;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        visibility: hidden;
+        opacity: 0;
+        transition:
+            opacity $duration-fast $ease-out,
+            visibility 0s $duration-fast;
+        pointer-events: none;
+
+        &[data-visible] {
+            visibility: visible;
+            opacity: 1;
+            transition: opacity $duration-fast $ease-out;
+        }
+    }
+
+    .live-seating-zones {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+    }
+
+    .live-seating-zone {
+        display: grid;
+        gap: 6px;
+        justify-items: start;
+        padding: 16px 18px;
+        border: 1px solid $color-border;
+        border-radius: 16px;
+        background: $color-background;
+        color: $color-foreground;
+        font: inherit;
+        text-align: left;
+        cursor: default;
+        transition:
+            border-color $duration-base,
+            box-shadow $duration-base;
+
+        &:not(:disabled):hover,
+        &:focus-visible,
+        &[data-hovered] {
+            border-color: $color-foreground;
+            outline: none;
+            box-shadow: 0 24px 50px -28px rgb(9 9 11 / 0.4);
+        }
+
+        &:disabled {
+            opacity: 0.55;
+        }
+
+        .live-seating-zone-title {
+            font-family: $font-serif;
+            font-size: 1.625rem;
+            font-weight: 600;
+            line-height: 1;
+        }
+
+        .live-seating-zone-seats {
+            color: $color-muted-foreground;
+            font-size: 0.8125rem;
+        }
+
+        .live-seating-zone-own {
+            position: relative;
+            padding-left: 14px;
+            color: $color-foreground;
+            font-size: 0.75rem;
+            font-weight: 600;
+
+            &::before {
+                position: absolute;
+                top: 50%;
+                left: 0;
+                width: 8px;
+                height: 8px;
+                border-radius: 2px;
+                background: $gradient-tricolour;
+                content: '';
+                translate: 0 -50%;
+            }
+        }
+    }
+}
