@@ -9,7 +9,9 @@ const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 const CONSTRAINED_DEVICE_QUERY = '(pointer: coarse), (max-width: 700px)';
 const SOFTWARE_RENDERER = /swiftshader|llvmpipe|softpipe|software/i;
 const SERVER_WEBGL_SUPPORT: WebglSupport = { isSupported: false, isSoftware: false };
+const FLYPAST_WAIT_MS = 6000;
 let cachedWebglSupport: WebglSupport | null = null;
+let flypastSignal: { promise: Promise<void>; resolve: () => void } | null = null;
 
 function isSlowConnection(): boolean {
     const connection = (navigator as Navigator & { connection?: NetworkInformationHints })
@@ -60,10 +62,39 @@ export function isConstrainedDevice(): boolean {
     return matchMedia(CONSTRAINED_DEVICE_QUERY).matches;
 }
 
-export function canRunScenes(): boolean {
-    if (isSlowConnection() || matchMedia(REDUCED_MOTION_QUERY).matches) return false;
+export function canRunScenes({ allowReducedMotion = false } = {}): boolean {
+    if (isSlowConnection()) return false;
+    if (!allowReducedMotion && matchMedia(REDUCED_MOTION_QUERY).matches) return false;
 
     return readWebglSupport().isSupported;
+}
+
+function readFlypastSignal(): { promise: Promise<void>; resolve: () => void } {
+    if (flypastSignal) return flypastSignal;
+
+    let resolve = () => undefined as void;
+    const promise = new Promise<void>((done) => {
+        resolve = done;
+    });
+
+    flypastSignal = { promise, resolve };
+
+    return flypastSignal;
+}
+
+export function resetFlypastReady(): void {
+    flypastSignal = null;
+}
+
+export function markFlypastReady(): void {
+    readFlypastSignal().resolve();
+}
+
+export function flypastReady(): Promise<void> {
+    return Promise.race([
+        readFlypastSignal().promise,
+        new Promise<void>((resolve) => setTimeout(resolve, FLYPAST_WAIT_MS)),
+    ]);
 }
 
 export function usePrefersReducedMotion(): boolean {

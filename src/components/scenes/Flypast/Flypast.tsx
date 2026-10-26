@@ -31,7 +31,11 @@ import {
     type Mesh,
 } from 'three';
 import './flypast.scss';
-import { usePrefersReducedMotion } from '@/components/scenes/sceneSupport';
+import {
+    markFlypastReady,
+    resetFlypastReady,
+    usePrefersReducedMotion,
+} from '@/components/scenes/sceneSupport';
 import { mergeAndDispose } from '@/components/scenes/geometry';
 import { SceneCanvas, StudioEnvironment } from '@/components/scenes/SceneCanvas/SceneCanvas';
 import {
@@ -696,6 +700,8 @@ function JetAnimation() {
 export function Flypast() {
     const prefersReducedMotion = usePrefersReducedMotion();
 
+    useEffect(() => resetFlypastReady, []);
+
     if (prefersReducedMotion) return null;
 
     return (
@@ -703,6 +709,7 @@ export function Flypast() {
             <SceneCanvas
                 fallback={null}
                 transparent
+                onFirstFrame={markFlypastReady}
                 camera={{ fov: CAMERA_FOV, near: 0.1, far: 600, position: [0, 0, 0] }}
             >
                 <JetAnimation />
