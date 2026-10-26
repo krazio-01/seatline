@@ -167,3 +167,33 @@ function stripSeparators(value: string): string {
 function stripPhonePrefix(value: string): string {
     return stripSeparators(value).replace(/^(\+91|0)/, '');
 }
+
+export type RegistrationState = 'open' | 'closed' | 'soldOut';
+
+export const REGISTRATION_STATE_COPY: Record<
+    Exclude<RegistrationState, 'open'>,
+    { title: string; description: string; action: string }
+> = {
+    closed: {
+        title: 'Registrations are closed',
+        description: 'Seats are not being reserved right now. Please check back later.',
+        action: 'Registrations closed',
+    },
+    soldOut: {
+        title: 'All seats are taken',
+        description: 'Every seat has been reserved. Thank you for your interest.',
+        action: 'All seats taken',
+    },
+};
+
+export function zoneSeatsText(zone: { capacity: number; booked: number }): string {
+    if (zone.capacity === 0) return 'Not in use';
+
+    const left = zone.capacity - zone.booked;
+
+    return left > 0 ? `${left} of ${zone.capacity} seats left` : 'Full';
+}
+
+export function toEventZones(zones: ZoneOccupancy[]): EventZone[] {
+    return zones.map(({ name, capacity, booked }) => ({ name, capacity, allocated: booked }));
+}

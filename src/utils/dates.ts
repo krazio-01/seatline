@@ -52,6 +52,12 @@ export function formatDate(
     return formatted.replace(/\b[ap]m\b/i, (dayPeriod) => dayPeriod.toUpperCase());
 }
 
+export function minutesIntoDay(date: Date, timeZone = APP_TIME_ZONE): number {
+    const [hours, minutes] = toDateTimeInputValue(date, timeZone).slice(-5).split(':');
+
+    return Number(hours) * 60 + Number(minutes);
+}
+
 export function toDateTimeInputValue(date: Date, timeZone = APP_TIME_ZONE): string {
     return getFormatter('inputDateTime', 'sv-SE', timeZone).format(date).replace(' ', 'T');
 }
