@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Cormorant_Garamond, Geist, Geist_Mono } from 'next/font/google';
 import './globals.scss';
 import { classNames } from '@/utils/class-names';
 
@@ -14,6 +14,14 @@ const geistMono = Geist_Mono({
     preload: false,
 });
 
+const cormorantGaramond = Cormorant_Garamond({
+    variable: '--font-serif',
+    subsets: ['latin'],
+    weight: ['500', '600'],
+    style: ['normal', 'italic'],
+    preload: false,
+});
+
 export const metadata: Metadata = {
     title: 'Event Registration',
     description: 'Register for the event and receive your zone and QR code by email.',
@@ -21,7 +29,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
     return (
-        <html lang="en" className={classNames(geistSans.variable, geistMono.variable)}>
+        <html
+            lang="en"
+            className={classNames(
+                geistSans.variable,
+                geistMono.variable,
+                cormorantGaramond.variable,
+            )}
+        >
             <body>{children}</body>
         </html>
     );

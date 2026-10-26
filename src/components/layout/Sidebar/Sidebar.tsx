@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { m, useReducedMotion } from 'motion/react';
 import './sidebar.scss';
+import { Brand } from '@/components/layout/Brand/Brand';
 import { SignOutButton } from '@/components/layout/Header/SignOutButton';
 import { useAppContext } from '@/context/appContext';
 import { DURATION, EASE_OUT } from '@/utils/motion';
@@ -24,13 +25,7 @@ export function Sidebar({ subtitle, userName }: { subtitle: string; userName: st
     return (
         <aside className="sidebar">
             <div className="sidebar-brand">
-                <span className="sidebar-brand-mark" aria-hidden="true">
-                    {event.eventName.charAt(0)}
-                </span>
-                <span className="sidebar-brand-text">
-                    {event.eventName}
-                    <small className="sidebar-brand-subtitle">{subtitle}</small>
-                </span>
+                <Brand name={event.eventName} subtitle={subtitle} />
             </div>
 
             <div className="sidebar-nav">

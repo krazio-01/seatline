@@ -1,0 +1,36 @@
+@use 'tokens' as *;
+
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    color: $color-foreground;
+    line-height: 1.25;
+
+    .brand-crest {
+        flex-shrink: 0;
+        width: auto;
+        height: 36px;
+    }
+
+    .brand-text {
+        display: grid;
+        min-width: 0;
+
+        .brand-name {
+            overflow: hidden;
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .brand-subtitle {
+            color: $color-muted-foreground;
+            font-size: 0.6875rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+    }
+}

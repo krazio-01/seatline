@@ -17,6 +17,15 @@
             gap: 10px;
             min-width: 0;
 
+            .scanner-crest {
+                padding-right: 10px;
+                border-right: 1px solid $color-border;
+
+                .brand-crest {
+                    height: 32px;
+                }
+            }
+
             .scanner-checker-avatar {
                 display: grid;
                 flex: none;

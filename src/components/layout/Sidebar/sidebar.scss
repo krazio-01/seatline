@@ -39,29 +39,14 @@
             padding: 0;
         }
 
-        .sidebar-brand-mark {
-            display: grid;
-            flex-shrink: 0;
-            place-items: center;
-            width: 28px;
-            height: 28px;
-            border-radius: 7px;
-            background: $color-foreground;
-            color: $color-background;
-            font-size: 0.8125rem;
-            font-weight: 700;
+        .brand-crest {
+            height: 32px;
         }
 
-        .sidebar-brand-text {
-            min-width: 0;
-            font-size: 0.875rem;
-
-            .sidebar-brand-subtitle {
-                display: block;
-                color: $color-muted-foreground;
-                font-size: 0.75rem;
-                font-weight: 400;
-            }
+        .brand-subtitle {
+            letter-spacing: 0;
+            text-transform: none;
+            font-weight: 400;
         }
     }
 
