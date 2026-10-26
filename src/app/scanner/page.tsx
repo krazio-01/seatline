@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { CalendarX2Icon } from 'lucide-react';
 import './page.scss';
+import { Brand } from '@/components/layout/Brand/Brand';
 import { Header } from '@/components/layout/Header/Header';
 import { SignOutButton } from '@/components/layout/Header/SignOutButton';
 import { SCANNER_SIGN_IN_HREF } from '@/components/layout/navigation';
@@ -30,6 +31,7 @@ export default async function Page() {
             className="scanner-header"
             start={
                 <div className="scanner-checker">
+                    <Brand name="Indian Air Force" isCompact className="scanner-crest" />
                     <span className="scanner-checker-avatar" aria-hidden="true">
                         {initials(session.name)}
                     </span>

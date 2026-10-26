@@ -15,18 +15,10 @@ export function Hero({
     isRegistrationOpen: boolean;
     maxGuestsPerBooking: number;
 }) {
-    const brandLetter = eventName.trim().charAt(0).toUpperCase();
     const yearDelay = Array.from(eventName).length * LETTER_INTERVAL;
 
     return (
         <header className="hero">
-            <div className="hero-brand">
-                <span className="hero-mark" aria-hidden="true">
-                    {brandLetter}
-                </span>
-                {eventName}
-            </div>
-
             <div className="hero-heading">
                 <Badge variant="outline" className="hero-badge">
                     <span

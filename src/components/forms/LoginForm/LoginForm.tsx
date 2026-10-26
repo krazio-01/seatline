@@ -5,12 +5,13 @@ import { LockKeyholeIcon, UserRoundIcon } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import './loginForm.scss';
 import { Form, FormField, FormSubmit, readTextFields } from '@/components/forms/Form/Form';
+import { Brand } from '@/components/layout/Brand/Brand';
 import { Button } from '@/components/ui/Button/Button';
 import { useAppContext, useUpdateAppContext } from '@/context/appContext';
 import { advanceSignIn, type SignInEvent } from '@/context/appStore';
 import { api } from '@/services/client/api';
 import type { SessionRole } from '@/types/admin';
-import { initials, pluralize } from '@/utils/text';
+import { pluralize } from '@/utils/text';
 
 type LoginField = 'username' | 'password';
 
@@ -128,9 +129,7 @@ export function LoginForm({
                 onInput={() => report('keystroke')}
             >
                 <div className="login-form-brand">
-                    <span className="login-form-mark" aria-hidden="true">
-                        {initials(eventName, 1)}
-                    </span>
+                    <Brand name={eventName} isCompact className="login-form-crest" />
                     <p className="login-form-eyebrow">
                         {copy.eyebrow}
                         <strong className="login-form-event">{eventName}</strong>

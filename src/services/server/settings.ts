@@ -1,10 +1,44 @@
 import 'server-only';
+import { unstable_cache } from 'next/cache';
 import { z } from 'zod';
 import { connectDb } from '@/lib/db';
 import { NotFoundError, SettingsConflictError } from '@/lib/errors';
 import { EVENT_SETTINGS_KEY, SettingsModel, type SettingsDocument } from '@/models';
 import type { EventSettings, EventSettingsFields } from '@/types/admin';
-import { EVENT_ZONES, type EventZone, type ZoneName } from '@/types/booking';
+import {
+    EVENT_ZONES,
+    ZONE_LABELS,
+    type EventZone,
+    type RegistrationState,
+    type ZoneName,
+} from '@/types/booking';
+import { formatDate, minutesIntoDay } from '@/utils/dates';
+
+export type PublicSettings = Pick<
+    EventSettings,
+    | 'eventName'
+    | 'eventDate'
+    | 'gatesOpenAt'
+    | 'venue'
+    | 'zones'
+    | 'maxGuestsPerBooking'
+    | 'bookingsOpen'
+>;
+
+export type TimelineStep = { label: string; title: string; description: string };
+
+export type EventTimeline = {
+    steps: TimelineStep[];
+    gatesOpen: string;
+    paradeBegins: string;
+    clock: { startMinutes: number; endMinutes: number; paradeMinutes: number };
+};
+
+const PUBLIC_SETTINGS_CACHE_SECONDS = 15;
+
+const CLOCK_LEAD_MINUTES = 8;
+
+const CLOCK_TAIL_MINUTES = 60;
 
 const trimmedText = z.string().trim();
 
@@ -59,6 +93,24 @@ function toEventSettings(settings: SettingsDocument): EventSettings {
         allocatedSeats: zones.reduce((seats, zone) => seats + zone.allocated, 0),
     };
 }
+
+const readCachedPublicSettings = unstable_cache(
+    async () => {
+        const settings = await getEventSettings();
+
+        return {
+            eventName: settings.eventName,
+            eventDate: settings.eventDate.toISOString(),
+            gatesOpenAt: settings.gatesOpenAt.toISOString(),
+            venue: settings.venue,
+            zones: settings.zones,
+            maxGuestsPerBooking: settings.maxGuestsPerBooking,
+            bookingsOpen: settings.bookingsOpen,
+        };
+    },
+    ['public-settings'],
+    { revalidate: PUBLIC_SETTINGS_CACHE_SECONDS },
+);
 
 export function pickZone(zones: EventZone[], partySize: number): ZoneName | null {
     const zoneWithRoom = EVENT_ZONES.find((name) => {
@@ -120,4 +172,74 @@ export async function updateEventSettings(input: EventSettingsFields): Promise<E
     throw new SettingsConflictError(
         'A zone cannot shrink below the seats already allocated in it.',
     );
+}
+
+export function registrationState(
+    settings: Pick<EventSettings, 'bookingsOpen' | 'zones'>,
+): RegistrationState {
+    if (pickZone(settings.zones, 1) === null) return 'soldOut';
+
+    return settings.bookingsOpen ? 'open' : 'closed';
+}
+
+export function buildEventTimeline(
+    settings: Pick<EventSettings, 'gatesOpenAt' | 'eventDate'>,
+): EventTimeline {
+    const gatesOpen = formatDate(settings.gatesOpenAt, 'time');
+    const paradeBegins = formatDate(settings.eventDate, 'time');
+    const paradeMinutes = minutesIntoDay(settings.eventDate);
+    const zoneNames = EVENT_ZONES.map((zone) => ZONE_LABELS[zone]).join(' and ');
+
+    return {
+        gatesOpen,
+        paradeBegins,
+        clock: {
+            startMinutes: minutesIntoDay(settings.gatesOpenAt) - CLOCK_LEAD_MINUTES,
+            endMinutes: paradeMinutes + CLOCK_TAIL_MINUTES,
+            paradeMinutes,
+        },
+        steps: [
+            {
+                label: gatesOpen,
+                title: 'Gates open',
+                description:
+                    "Passes are scanned at the gate. Keep every guest's Aadhaar card ready.",
+            },
+            {
+                label: 'Then',
+                title: 'Guests seated',
+                description: `${zoneNames} fill from the front rows.`,
+            },
+            {
+                label: paradeBegins,
+                title: 'Parade begins',
+                description: 'Arrival of the Reviewing Officer and the general salute.',
+            },
+            {
+                label: 'Then',
+                title: 'March past',
+                description: 'Contingents march past the dais in slow and quick time.',
+            },
+            {
+                label: 'Then',
+                title: 'Awards and passing out',
+                description: 'Awards are presented and the new officers pass out.',
+            },
+            {
+                label: 'Finale',
+                title: 'Flypast',
+                description: 'The morning closes with a flypast over the parade ground.',
+            },
+        ],
+    };
+}
+
+export async function readPublicSettings(): Promise<PublicSettings> {
+    const settings = await readCachedPublicSettings();
+
+    return {
+        ...settings,
+        eventDate: new Date(settings.eventDate),
+        gatesOpenAt: new Date(settings.gatesOpenAt),
+    };
 }

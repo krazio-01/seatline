@@ -10,10 +10,11 @@ import {
     type ReactNode,
 } from 'react';
 import { Canvas, useFrame, useThree, type CameraProps } from '@react-three/fiber';
-import { PCFShadowMap, PMREMGenerator, setConsoleFunction, WebGLRenderer } from 'three';
+import { PCFShadowMap, PMREMGenerator, WebGLRenderer } from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import './sceneCanvas.scss';
 import { classNames } from '@/utils/class-names';
+import { silenceClockDeprecation } from '@/components/scenes/geometry';
 import {
     isConstrainedDevice,
     readServerWebglSupport,
@@ -26,15 +27,10 @@ const SLOW_FRAME_SECONDS = 0.02;
 const SLOW_STREAK_SECONDS = 1;
 const IGNORED_GAP_SECONDS = 0.25;
 const SOFT_SHADOWS = { enabled: true, type: PCFShadowMap };
-const DEPRECATED_CLOCK_WARNING = 'THREE.Clock: This module has been deprecated';
 const SLOW_STREAKS_BEFORE_LOW_POWER = 2;
 const SceneQualityContext = createContext({ isLowPower: false });
 
-setConsoleFunction((type, message, ...params) => {
-    if (message.startsWith(DEPRECATED_CLOCK_WARNING)) return;
-
-    console[type](message, ...params);
-});
+silenceClockDeprecation();
 
 function FrameloopController({ isActive, isStill }: { isActive: boolean; isStill: boolean }) {
     const setFrameloop = useThree((state) => state.setFrameloop);
