@@ -1,6 +1,8 @@
 import 'server-only';
 import mongoose from 'mongoose';
 import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import QRCode from 'qrcode';
 import { getEnv } from '@/lib/env';
 import { connectDb } from '@/lib/db';
@@ -16,7 +18,7 @@ import {
 import { logger } from '@/lib/logger';
 import { EMAIL_PROOF_SECONDS, signEmailProof, verifyEmailProof } from '@/lib/security/tokens';
 import { BookingModel, EmailVerificationModel } from '@/models';
-import type { EmailSender } from '@/providers/email';
+import type { EmailMessage, EmailSender } from '@/providers/email';
 import { renderConfirmationEmail, renderVerificationEmail } from '@/templates/emails';
 import type { EmailDelivery, EmailStatus, ZoneName } from '@/types/booking';
 import { getEventSettings } from './settings';
@@ -34,15 +36,34 @@ const DAY_MS = 24 * 60 * 60_000;
 export const DAILY_LIMIT_MESSAGE = 'Daily email limit reached';
 const GENERIC_FAILURE_MESSAGE = 'Email could not be sent';
 const QR_CONTENT_ID = 'invitation-qr';
+const CREST_CONTENT_ID = 'event-crest';
+const CREST_IMAGE_PATH = path.join(process.cwd(), 'public/images/crest-email.png');
 export const OTP_VALID_SECONDS = 600;
 export const MAX_CODE_ATTEMPTS = 5;
 export const EMAILS_PER_BOOKING = 2;
 const CODE_DIGITS = 6;
 
+let crestImage: Promise<Buffer> | null = null;
+
+async function crestAttachment(): Promise<NonNullable<EmailMessage['attachments']>[number]> {
+    crestImage ??= readFile(CREST_IMAGE_PATH).catch((error: unknown) => {
+        crestImage = null;
+        throw error;
+    });
+
+    return {
+        filename: 'crest.png',
+        content: await crestImage,
+        contentType: 'image/png',
+        cid: CREST_CONTENT_ID,
+    };
+}
+
 async function attemptDelivery(
     booking: {
         _id: unknown;
         studentName: string;
+        studentGroup: string;
         zone: ZoneName;
         seatCount: number;
         qrToken: string;
@@ -70,10 +91,13 @@ async function attemptDelivery(
                 gatesOpenAt: settings.gatesOpenAt,
                 venue: settings.venue,
                 studentName: booking.studentName,
+                studentGroup: booking.studentGroup,
                 guestNames: booking.guests.map((guest) => guest.name),
                 zone: booking.zone,
                 seatCount: booking.seatCount,
+                appUrl: getEnv().APP_URL,
                 qrContentId: QR_CONTENT_ID,
+                crestContentId: CREST_CONTENT_ID,
             });
 
             await sender.send({
@@ -87,6 +111,7 @@ async function attemptDelivery(
                         contentType: 'image/png',
                         cid: QR_CONTENT_ID,
                     },
+                    await crestAttachment(),
                 ],
             });
 
@@ -227,11 +252,15 @@ export async function startEmailVerification(
     });
 
     try {
+        const settings = await getEventSettings();
         const { subject, html } = renderVerificationEmail({
             code,
             validMinutes: OTP_VALID_SECONDS / 60,
+            eventName: settings.eventName,
+            eventDate: settings.eventDate,
+            crestContentId: CREST_CONTENT_ID,
         });
-        await sender.send({ to: email, subject, html });
+        await sender.send({ to: email, subject, html, attachments: [await crestAttachment()] });
     } catch (error) {
         logger.error(
             {

@@ -1,5 +1,5 @@
 import 'server-only';
-import mongoose, { type ClientSession, type Types } from 'mongoose';
+import mongoose, { type ClientSession, Types } from 'mongoose';
 import sharp from 'sharp';
 import { z } from 'zod';
 import { connectDb, pagingQueryFields, resolvePaging } from '@/lib/db';
@@ -13,7 +13,7 @@ import {
     TooManyGuestsError,
     ValidationError,
 } from '@/lib/errors';
-import { writeAudit } from '@/lib/logger';
+import { logger, writeAudit } from '@/lib/logger';
 import {
     decryptBytes,
     decryptField,
@@ -36,6 +36,7 @@ import {
     AADHAAR_GROUP_SIZE,
     AADHAAR_LENGTH,
     type BookingConfirmation,
+    type CardCheck,
     type CreateBookingInput,
     EVENT_ZONES,
     type ZoneName,
@@ -45,11 +46,18 @@ import { toEmailDelivery } from './emails';
 import { pickZone } from './settings';
 
 type BookingWithTimestamps = BookingDocument & { _id: unknown; createdAt: Date };
-export type RevealedGuest = { name: string; aadhaar: string | null; hasPhoto: boolean };
+export type RevealedGuest = {
+    name: string;
+    aadhaar: string | null;
+    hasPhoto: boolean;
+    cardCheck: CardCheck | null;
+};
 
 type PhotoUpload = { image: Buffer; aadhaar: string; name: string };
 
 type ReadCard = { image: Buffer; words: RecognizedWord[]; match: NumberMatch };
+
+type CheckedCard = { image: Buffer; masked: Buffer | null; cardCheck: CardCheck };
 
 type GuestPhoto = { name: string; aadhaar: string; photoId: string };
 
@@ -76,11 +84,7 @@ const MAX_NUMBER_GROUPS = 3;
 const MASK_PADDING = 4;
 
 export const PHOTO_REJECTIONS = {
-    missing:
-        "We couldn't read the Aadhaar number on this photo. Retake it in good light with the whole card in view.",
-    mismatch: "This card doesn't match the Aadhaar number you entered.",
     unreadable: "We couldn't open this photo. Take a new one or choose a JPEG, PNG or WebP photo.",
-    name: "We couldn't read the name on this card. Retake it so the name and number are clear, and check the name matches the card.",
 };
 
 export const bookingListQuerySchema: z.ZodType<BookingListQuery, unknown> = z.object({
@@ -145,9 +149,13 @@ async function bookInTransaction(
     );
     if (!student) throw new StudentAlreadyBookedError();
 
+    const bookingId = new Types.ObjectId();
+    const cardChecks = await attachGuestPhotos(bookingId, input.guests, session);
+
     const [booking] = await BookingModel.create(
         [
             {
+                _id: bookingId,
                 studentId: student._id,
                 studentName: student.name,
                 studentGroup: student.group,
@@ -156,20 +164,19 @@ async function bookInTransaction(
                 email: { status: 'pending', attempts: 0 },
                 zone,
                 seatCount: input.guests.length,
-                guests: input.guests.map((guest) => ({
+                guests: input.guests.map((guest, guestIndex) => ({
                     name: guest.name,
                     aadhaarEncrypted: encryptField(guest.aadhaar),
                     aadhaarLast4: guest.aadhaar.slice(-4),
                     phone: guest.phone,
                     email: guest.email,
                     photoId: guest.photoId,
+                    cardCheck: cardChecks[guestIndex],
                 })),
             },
         ],
         { session },
     );
-
-    await attachGuestPhotos(booking._id, input.guests, session);
 
     return toConfirmation(booking, input.studentId);
 }
@@ -296,7 +303,21 @@ async function readCard(
         match = findAadhaarNumber(read.words, aadhaar);
     }
 
+    if (match.status === 'missing') return { image: upright, words: [], match };
+
     return { ...read, match };
+}
+
+async function checkCard(card: ReadCard, guestName: string): Promise<CheckedCard> {
+    const { image, words, match } = card;
+    if (match.status === 'mismatch') return { image, masked: null, cardCheck: 'mismatch' };
+    if (match.status === 'missing') return { image, masked: null, cardCheck: 'unverified' };
+
+    const { width = 0, height = 0 } = await sharp(image).metadata();
+    const plan = maskPlan(words, guestName, match.words, { width, height });
+    if (!plan) return { image, masked: null, cardCheck: 'unverified' };
+
+    return { image, masked: await maskImage(image, plan, width, height), cardCheck: 'verified' };
 }
 
 function svgRect(box: Box, fill: string): string {
@@ -422,6 +443,7 @@ export async function revealAadhaar(
         name: guest.name,
         aadhaar: guest.aadhaarEncrypted ? decryptField(guest.aadhaarEncrypted) : null,
         hasPhoto: Boolean(guest.photoId),
+        cardCheck: guest.cardCheck ?? null,
     }));
 }
 
@@ -494,41 +516,40 @@ export function guestNameHash(name: string): string {
 export async function storeAadhaarPhoto(
     upload: PhotoUpload,
     recognizer: TextRecognizer,
-): Promise<{ photoId: string }> {
+): Promise<{ photoId: string; cardCheck: CardCheck }> {
     const upright = await normalizeImage(upload.image);
-    const { image, words, match } = await readCard(upright, upload.aadhaar, recognizer);
 
-    if (match.status !== 'match')
-        throw new AadhaarPhotoRejectedError(PHOTO_REJECTIONS[match.status]);
-
-    const { width = 0, height = 0 } = await sharp(image).metadata();
-    const plan = maskPlan(words, upload.name, match.words, { width, height });
-    if (!plan) throw new AadhaarPhotoRejectedError(PHOTO_REJECTIONS.name);
-
-    const masked = await maskImage(image, plan, width, height);
+    let checked: CheckedCard = { image: upright, masked: null, cardCheck: 'unverified' };
+    try {
+        checked = await checkCard(await readCard(upright, upload.aadhaar, recognizer), upload.name);
+    } catch (error) {
+        logger.warn({ err: error }, 'Aadhaar card check failed, storing the photo unverified');
+    }
 
     await connectDb();
 
     const photo = await AadhaarPhotoModel.create({
-        original: encryptBytes(image),
-        masked: encryptBytes(masked),
+        original: encryptBytes(checked.image),
+        masked: checked.masked ? encryptBytes(checked.masked) : null,
+        cardCheck: checked.cardCheck,
         aadhaarHash: hashField(upload.aadhaar),
         nameHash: guestNameHash(upload.name),
         expiresAt: new Date(Date.now() + PENDING_PHOTO_MS),
     });
 
-    return { photoId: String(photo._id) };
+    return { photoId: String(photo._id), cardCheck: checked.cardCheck };
 }
 
 export async function attachGuestPhotos(
     bookingId: Types.ObjectId,
     guests: GuestPhoto[],
     session: ClientSession,
-): Promise<void> {
+): Promise<CardCheck[]> {
     const now = new Date();
+    const cardChecks: CardCheck[] = [];
 
     for (const [guestIndex, guest] of guests.entries()) {
-        const { matchedCount } = await AadhaarPhotoModel.updateOne(
+        const photo = await AadhaarPhotoModel.findOneAndUpdate(
             {
                 _id: guest.photoId,
                 status: 'pending',
@@ -537,15 +558,19 @@ export async function attachGuestPhotos(
                 nameHash: guestNameHash(guest.name),
             },
             { $set: { status: 'attached', bookingId, guestIndex, expiresAt: null } },
-            { session },
+            { session, projection: { cardCheck: 1 }, lean: true },
         );
 
-        if (matchedCount === 0) {
+        if (!photo) {
             throw new ValidationError([
                 { path: `guests.${guestIndex}.photoId`, message: 'Upload the Aadhaar card again' },
             ]);
         }
+
+        cardChecks.push(photo.cardCheck ?? 'verified');
     }
+
+    return cardChecks;
 }
 
 export function issuePhotoToken(photoId: string, checkerId: string): Promise<string> {
@@ -566,7 +591,7 @@ export async function readMaskedPhoto(
         { _id: claims.photoId, status: 'attached' },
         { masked: 1, bookingId: 1 },
     );
-    if (!photo) throw new NotFoundError('Photo not found');
+    if (!photo?.masked) throw new NotFoundError('Photo not found');
 
     await writeAudit({
         actor: `checker:${checkerId}`,

@@ -16,10 +16,15 @@ import { Button } from '@/components/ui/Button/Button';
 import { Skeleton } from '@/components/ui/Skeleton/Skeleton';
 import { useToast } from '@/components/ui/Toast/Toast';
 import { ApiError, api } from '@/services/client/api';
-import { AADHAAR_GROUP_SIZE } from '@/types/booking';
+import { AADHAAR_GROUP_SIZE, type CardCheck } from '@/types/booking';
 import { groupCharacters } from '@/utils/text';
 
-type RevealedGuest = { name: string; aadhaar: string | null; hasPhoto: boolean };
+type RevealedGuest = {
+    name: string;
+    aadhaar: string | null;
+    hasPhoto: boolean;
+    cardCheck: CardCheck | null;
+};
 
 type RevealResult =
     { status: 'loaded'; guests: RevealedGuest[] } | { status: 'failed'; message: string };
@@ -34,6 +39,10 @@ type RevealTarget = {
 type DeleteState = 'idle' | 'confirming' | 'deleting' | 'deleted';
 
 const CARD_PHOTO_SIZE = { width: 320, height: 202 };
+const CARD_CHECK_LABELS: Record<Exclude<CardCheck, 'verified'>, string> = {
+    mismatch: 'The number on the card did not match the one entered',
+    unverified: 'The card could not be read automatically',
+};
 
 function GuestSkeletons({ count }: { count: number }) {
     return (
@@ -132,6 +141,12 @@ function RevealedGuests({ target }: { target: RevealTarget }) {
                                 <span className="aadhaar-reveal-purged">Removed</span>
                             )}
                         </div>
+
+                        {guest.cardCheck && guest.cardCheck !== 'verified' && (
+                            <span className="aadhaar-reveal-card-check">
+                                {CARD_CHECK_LABELS[guest.cardCheck]}
+                            </span>
+                        )}
 
                         {guest.hasPhoto && deleteState !== 'deleted' ? (
                             <Image

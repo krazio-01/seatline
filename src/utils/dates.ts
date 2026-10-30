@@ -15,6 +15,7 @@ const DATE_FORMATS = {
     },
     time: { hour: 'numeric', minute: '2-digit', hour12: true },
     year: { year: 'numeric' },
+    fullDate: { dateStyle: 'full' },
     fullDateTime: { dateStyle: 'full', timeStyle: 'short' },
     inputDateTime: {
         year: 'numeric',
@@ -42,6 +43,17 @@ function getFormatter(format: DateFormat, locale: string, timeZone: string) {
     return formatter;
 }
 
+function toCalendarTimestamp(date: Date): string {
+    return date
+        .toISOString()
+        .replace(/[-:]/g, '')
+        .replace(/\.\d{3}/, '');
+}
+
+function escapeCalendarText(value: string): string {
+    return value.replace(/[\\;,]/g, (character) => `\\${character}`).replace(/\r?\n/g, '\\n');
+}
+
 export function formatDate(
     date: Date,
     format: DateFormat,
@@ -64,4 +76,30 @@ export function toDateTimeInputValue(date: Date, timeZone = APP_TIME_ZONE): stri
 
 export function fromDateTimeInputValue(value: string, utcOffset = APP_UTC_OFFSET): Date {
     return new Date(`${value}:00${utcOffset}`);
+}
+
+export function toCalendarEvent(event: {
+    id: string;
+    title: string;
+    start: Date;
+    location: string;
+    description: string;
+    createdAt?: Date;
+}): string {
+    const lines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Campus Event//Registration//EN',
+        'BEGIN:VEVENT',
+        `UID:${event.id}`,
+        `DTSTAMP:${toCalendarTimestamp(event.createdAt ?? new Date())}`,
+        `DTSTART:${toCalendarTimestamp(event.start)}`,
+        `SUMMARY:${escapeCalendarText(event.title)}`,
+        `LOCATION:${escapeCalendarText(event.location)}`,
+        `DESCRIPTION:${escapeCalendarText(event.description)}`,
+        'END:VEVENT',
+        'END:VCALENDAR',
+    ];
+
+    return `${lines.join('\r\n')}\r\n`;
 }

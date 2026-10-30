@@ -24,7 +24,7 @@ import {
 } from '@/utils/booking-form';
 import { useBotCheck, useEmailVerification } from '@/components/forms/BookingForm/bookingFormHooks';
 import { DetailsStep, VerifyStep } from '@/components/forms/BookingForm/BookingSteps';
-import { BookingPass } from '@/components/widgets/BookingPass/BookingPass';
+import { BookingPass, type PassEvent } from '@/components/widgets/BookingPass/BookingPass';
 import type { BookingConfirmation } from '@/types/booking';
 import type { StudentOption } from '@/types/booking';
 import { createBookingBodySchema } from '@/types/booking';
@@ -36,7 +36,7 @@ const STEP_SHIFT_PX = 16;
 const STEP_DESCRIPTIONS: Record<BookingStep, string> = {
     details: 'Fill in the details exactly as on the Aadhaar card.',
     verify: "Confirm Guest 1's email to reserve your seats.",
-    pass: 'Your seats are reserved.',
+    pass: 'Your registration is complete.',
 };
 
 const validateBooking = zodResolver(createBookingBodySchema, undefined, { raw: true });
@@ -51,9 +51,11 @@ const detailsResolver: Resolver<BookingDetailsValues> = (values, context, option
 export function BookingForm({
     maxGuestsPerBooking,
     turnstileSiteKey,
+    event,
 }: {
     maxGuestsPerBooking: number;
     turnstileSiteKey?: string;
+    event: PassEvent;
 }) {
     const updateAppContext = useUpdateAppContext();
     const booking = useAppContext('booking');
@@ -140,7 +142,12 @@ export function BookingForm({
                                 )}
 
                                 {step === 'pass' && confirmation && (
-                                    <BookingPass confirmation={confirmation} student={student} />
+                                    <BookingPass
+                                        confirmation={confirmation}
+                                        student={student}
+                                        event={event}
+                                        guests={form.getValues('guests')}
+                                    />
                                 )}
                             </m.div>
                         </AnimatePresence>

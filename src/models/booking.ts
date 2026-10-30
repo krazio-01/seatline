@@ -1,5 +1,5 @@
 import { type InferSchemaType, type Model, model, models, Schema } from 'mongoose';
-import { EVENT_ZONES } from '@/types/booking';
+import { CARD_CHECKS, EVENT_ZONES } from '@/types/booking';
 
 const guestSchema = new Schema(
     {
@@ -9,6 +9,7 @@ const guestSchema = new Schema(
         phone: { type: String, required: true },
         email: { type: String, required: true },
         photoId: { type: Schema.Types.ObjectId, ref: 'AadhaarPhoto', default: null },
+        cardCheck: { type: String, enum: CARD_CHECKS, default: null },
     },
     { _id: false },
 );

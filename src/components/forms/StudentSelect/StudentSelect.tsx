@@ -68,7 +68,7 @@ export function StudentSelect({
 
     useEffect(() => {
         const openOnShortcut = (event: KeyboardEvent) => {
-            if (event.key.toLowerCase() !== 'k' || !(event.metaKey || event.ctrlKey)) return;
+            if (!(event.metaKey || event.ctrlKey) || event.key?.toLowerCase() !== 'k') return;
 
             event.preventDefault();
             openMenu();

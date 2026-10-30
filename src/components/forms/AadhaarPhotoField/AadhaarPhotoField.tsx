@@ -1,16 +1,24 @@
 'use client';
 import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react';
 import Image from 'next/image';
-import { CameraIcon, CheckIcon, ImageUpIcon, LoaderCircleIcon, RotateCcwIcon } from 'lucide-react';
+import {
+    CameraIcon,
+    CheckIcon,
+    ImageUpIcon,
+    InfoIcon,
+    LoaderCircleIcon,
+    RotateCcwIcon,
+} from 'lucide-react';
 import './aadhaarPhotoField.scss';
 import { FieldError } from '@/components/forms/FieldError/FieldError';
 import { Button } from '@/components/ui/Button/Button';
 import { ApiError, api, fieldErrorsOf } from '@/services/client/api';
+import type { CardCheck } from '@/types/booking';
 
 type PhotoState =
     | { status: 'idle' }
     | { status: 'checking' }
-    | { status: 'accepted'; previewUrl: string }
+    | { status: 'accepted'; previewUrl: string; cardCheck: CardCheck }
     | { status: 'rejected'; message: string };
 
 const LONGEST_SIDE = 1600;
@@ -18,6 +26,12 @@ const JPEG_QUALITY = 0.8;
 const THUMBNAIL_SIZE = { width: 72, height: 46 };
 const UNREADABLE_PHOTO_MESSAGE =
     "We couldn't open this photo. Take a new one or choose a JPEG, PNG or WebP photo.";
+const UNCHECKED_CARD_NOTES: Record<Exclude<CardCheck, 'verified'>, string> = {
+    mismatch:
+        "The number on this card doesn't look like the one you entered. Check the number, or continue and show the card at the gate.",
+    unverified:
+        "We couldn't read this card automatically. You can still continue, just bring the card to the gate.",
+};
 
 function describeUploadFailure(error: unknown): string {
     if (!(error instanceof ApiError)) return UNREADABLE_PHOTO_MESSAGE;
@@ -110,7 +124,11 @@ export function AadhaarPhotoField({
                 controller.signal,
             );
 
-            setState({ status: 'accepted', previewUrl: URL.createObjectURL(image) });
+            setState({
+                status: 'accepted',
+                previewUrl: URL.createObjectURL(image),
+                cardCheck: accepted.cardCheck,
+            });
             onChange(accepted.photoId);
         } catch (error) {
             if (controller.signal.aborted) return;
@@ -128,6 +146,10 @@ export function AadhaarPhotoField({
 
     const isChecking = shownState.status === 'checking';
     const canPick = isReady && !isChecking;
+    const cardNote =
+        shownState.status === 'accepted' && shownState.cardCheck !== 'verified'
+            ? UNCHECKED_CARD_NOTES[shownState.cardCheck]
+            : null;
 
     return (
         <div
@@ -162,7 +184,10 @@ export function AadhaarPhotoField({
             />
 
             {shownState.status === 'accepted' ? (
-                <div className="aadhaar-photo-field-preview">
+                <div
+                    className="aadhaar-photo-field-preview"
+                    data-unchecked={cardNote ? 'true' : undefined}
+                >
                     <Image
                         src={shownState.previewUrl}
                         alt="Your Aadhaar card photo"
@@ -172,8 +197,12 @@ export function AadhaarPhotoField({
                         className="aadhaar-photo-field-thumbnail"
                     />
                     <span className="aadhaar-photo-field-accepted">
-                        <CheckIcon aria-hidden="true" />
-                        Card checked
+                        {cardNote ? (
+                            <InfoIcon aria-hidden="true" />
+                        ) : (
+                            <CheckIcon aria-hidden="true" />
+                        )}
+                        {cardNote ? 'Photo added' : 'Card checked'}
                     </span>
                     <Button
                         variant="ghost"
@@ -214,6 +243,8 @@ export function AadhaarPhotoField({
                         />
                         Checking your card…
                     </>
+                ) : cardNote ? (
+                    cardNote
                 ) : isReady ? (
                     'The whole front of the card, in good light.'
                 ) : (

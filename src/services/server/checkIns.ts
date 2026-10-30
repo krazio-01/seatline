@@ -26,9 +26,11 @@ async function summarize(booking: BookingDocument, checkerId: string): Promise<C
             aadhaarMasked: guest.aadhaarLast4
                 ? groupCharacters(maskStart(guest.aadhaarLast4, AADHAAR_LENGTH), AADHAAR_GROUP_SIZE)
                 : null,
-            photoToken: guest.photoId
-                ? await issuePhotoToken(String(guest.photoId), checkerId)
-                : null,
+            photoToken:
+                guest.photoId && (guest.cardCheck ?? 'verified') === 'verified'
+                    ? await issuePhotoToken(String(guest.photoId), checkerId)
+                    : null,
+            cardCheck: guest.cardCheck ?? null,
         })),
     );
 
