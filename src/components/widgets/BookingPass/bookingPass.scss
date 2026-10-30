@@ -4,85 +4,224 @@
     display: grid;
     gap: 22px;
 
-    .booking-pass-check {
+    .booking-pass-label {
+        color: $color-muted-foreground;
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .booking-pass-heading {
         display: grid;
-        place-items: center;
-        width: 40px;
-        height: 40px;
-        border-radius: $radius-pill;
-        background: $color-primary;
-        color: $color-primary-foreground;
-
-        svg {
-            width: 20px;
-            height: 20px;
-        }
-    }
-
-    .booking-pass-title {
-        font-size: 1.125rem;
-        font-weight: 600;
-    }
-
-    .booking-pass-student {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: baseline;
-        gap: 8px;
-        margin-top: 4px;
-        font-size: 0.875rem;
-
-        .booking-pass-meta {
-            color: $color-muted-foreground;
-            font-family: $font-mono;
-            font-size: 0.75rem;
-        }
-    }
-
-    .booking-pass-seats {
-        display: grid;
+        justify-items: start;
         gap: 10px;
-        padding: 16px;
-        border: 1px solid $color-border;
-        border-radius: $radius;
-        background: $color-muted;
 
-        .booking-pass-label {
-            color: $color-muted-foreground;
-            font-size: 0.75rem;
+        .booking-pass-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 10px 4px 6px;
+            border: 1px solid $color-success-border;
+            border-radius: $radius-pill;
+            background: $color-success-surface;
+            color: $color-success-text;
+            font-size: 0.8125rem;
             font-weight: 500;
+
+            svg {
+                width: 16px;
+                height: 16px;
+            }
         }
 
-        .booking-pass-zone {
-            font-size: 1.75rem;
-            font-weight: 600;
-            letter-spacing: -0.02em;
-            line-height: 1.1;
+        .booking-pass-title {
+            font-family: $font-serif;
+            font-size: clamp(2.25rem, 6vw, 2.75rem);
+            font-weight: 500;
+            letter-spacing: -0.01em;
+            line-height: 1.05;
         }
 
-        .booking-pass-seat-count {
-            color: $color-muted-foreground;
-            font-size: 0.875rem;
+        .booking-pass-student {
+            color: $color-body-text;
+            font-size: 0.9375rem;
+
+            strong {
+                color: $color-foreground;
+                font-weight: 500;
+            }
+        }
+    }
+
+    .booking-pass-ticket {
+        overflow: hidden;
+        border: 1px solid $color-border;
+        border-radius: $radius-xl;
+        border-top: 0;
+
+        &::before {
+            display: block;
+            height: 4px;
+            background: linear-gradient(
+                90deg,
+                $color-tricolour-saffron 0 33.33%,
+                $color-border 33.33% 66.66%,
+                $color-tricolour-green 66.66% 100%
+            );
+            content: '';
+        }
+
+        .booking-pass-ticket-main {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px 24px;
+            padding: 22px 24px;
+
+            .booking-pass-zone {
+                display: grid;
+                gap: 2px;
+                min-width: 120px;
+
+                .booking-pass-zone-name {
+                    font-family: $font-serif;
+                    font-size: 5.5rem;
+                    font-weight: 500;
+                    line-height: 0.9;
+                }
+
+                .booking-pass-seat-count {
+                    color: $color-body-text;
+                    font-size: 0.875rem;
+                }
+            }
+
+            .booking-pass-details {
+                display: grid;
+                flex: 1 1 240px;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                align-content: start;
+                gap: 16px 20px;
+                margin: 0;
+
+                .booking-pass-detail {
+                    display: grid;
+                    gap: 2px;
+                    font-size: 0.875rem;
+
+                    dt {
+                        color: $color-muted-foreground;
+                        font-size: 0.75rem;
+                    }
+
+                    dd {
+                        margin: 0;
+                        font-weight: 500;
+                    }
+                }
+            }
+        }
+
+        .booking-pass-guests {
+            display: grid;
+            gap: 10px;
+            margin: 0 12px;
+            padding: 18px 12px 20px;
+            border-top: 1px dashed $color-border-strong;
+
+            ul {
+                display: grid;
+                gap: 10px;
+                margin: 0;
+                padding: 0;
+                list-style: none;
+            }
+
+            .booking-pass-guest {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                font-size: 0.875rem;
+
+                .booking-pass-guest-name {
+                    min-width: 0;
+                    overflow: hidden;
+                    font-weight: 500;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+
+                .booking-pass-guest-aadhaar {
+                    flex: none;
+                    color: $color-muted-foreground;
+                    font-family: $font-mono;
+                    font-size: 0.8125rem;
+                }
+            }
         }
     }
 
     .booking-pass-email {
         display: flex;
-        gap: 10px;
-        color: $color-muted-foreground;
+        gap: 12px;
+        padding: 16px;
+        border-radius: $radius-lg;
+        background: $color-muted;
+        color: $color-secondary-foreground;
         font-size: 0.875rem;
         line-height: 1.5;
 
         svg {
-            width: 16px;
-            height: 16px;
+            width: 18px;
+            height: 18px;
             flex-shrink: 0;
-            margin-top: 3px;
+            margin-top: 1px;
         }
 
         .booking-pass-address {
             color: $color-foreground;
             font-weight: 500;
+        }
+    }
+
+    .booking-pass-requirements {
+        display: grid;
+        gap: 10px;
+
+        ul {
+            display: grid;
+            gap: 10px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        li {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: $color-secondary-foreground;
+            font-size: 0.875rem;
+
+            svg {
+                width: 18px;
+                height: 18px;
+                flex-shrink: 0;
+            }
+        }
+    }
+
+    .booking-pass-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+
+        @media (max-width: $breakpoint-sm) {
+            grid-template-columns: minmax(0, 1fr);
+
+            > :last-child {
+                order: -1;
+            }
         }
     }
 }

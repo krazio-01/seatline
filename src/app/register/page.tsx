@@ -97,6 +97,12 @@ export default async function Page() {
                         <BookingForm
                             maxGuestsPerBooking={settings.maxGuestsPerBooking}
                             turnstileSiteKey={turnstileSiteKey}
+                            event={{
+                                name: settings.eventName,
+                                date: settings.eventDate,
+                                gatesOpenAt: settings.gatesOpenAt,
+                                venue: settings.venue,
+                            }}
                         />
                     ) : (
                         <Notice
