@@ -25,6 +25,15 @@
         border-radius: $radius;
         background: $color-success-surface;
 
+        &[data-unchecked='true'] {
+            border-color: $color-warning-border;
+            background: $color-warning-surface;
+
+            .aadhaar-photo-field-accepted {
+                color: $color-warning-text;
+            }
+        }
+
         .aadhaar-photo-field-thumbnail {
             width: 72px;
             height: 46px;

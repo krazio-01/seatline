@@ -14,6 +14,7 @@ import type {
 } from '@/types/admin';
 import type {
     BookingConfirmation,
+    CardCheck,
     CheckInResult,
     CreateBookingFormValues,
     EmailDelivery,
@@ -67,7 +68,7 @@ export const api = {
         upload: (
             photo: { image: Blob; aadhaar: string; name: string },
             signal?: AbortSignal,
-        ): Promise<{ photoId: string }> => {
+        ): Promise<{ photoId: string; cardCheck: CardCheck }> => {
             const form = new FormData();
 
             form.set('image', photo.image, 'aadhaar-card.jpg');
@@ -98,8 +99,14 @@ export const api = {
             }),
         revealAadhaar: (
             bookingId: string,
-        ): Promise<{ guests: { name: string; aadhaar: string | null; hasPhoto: boolean }[] }> =>
-            apiRequest(`${API_ROOT}/bookings/${encodeURIComponent(bookingId)}/aadhaar`),
+        ): Promise<{
+            guests: {
+                name: string;
+                aadhaar: string | null;
+                hasPhoto: boolean;
+                cardCheck: CardCheck | null;
+            }[];
+        }> => apiRequest(`${API_ROOT}/bookings/${encodeURIComponent(bookingId)}/aadhaar`),
         resendConfirmationEmail: (bookingId: string): Promise<EmailDelivery> =>
             apiRequest<EmailDelivery>(
                 `${API_ROOT}/bookings/${encodeURIComponent(bookingId)}/confirmation-emails`,

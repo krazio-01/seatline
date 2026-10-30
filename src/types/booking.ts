@@ -10,6 +10,8 @@ export type ZoneOccupancy = { name: ZoneName; capacity: number; booked: number; 
 
 export type ZoneBooking = { zone: ZoneName; seatCount: number };
 
+export type CardCheck = (typeof CARD_CHECKS)[number];
+
 export type EmailStatus = 'pending' | 'sent' | 'failed';
 
 export type EmailDelivery = {
@@ -30,6 +32,7 @@ export type CheckInGuest = {
     name: string;
     aadhaarMasked: string | null;
     photoToken: string | null;
+    cardCheck: CardCheck | null;
 };
 
 export type CheckInBooking = {
@@ -58,6 +61,7 @@ export const PHONE_LENGTH = 10;
 export const PHONE_GROUP_SIZES = [5, 5];
 export const EVENT_ZONES = ['C', 'D'] as const;
 export const ZONE_LABELS: Record<ZoneName, string> = { C: 'Zone C', D: 'Zone D' };
+export const CARD_CHECKS = ['verified', 'mismatch', 'unverified'] as const;
 export const AADHAAR_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 export const MAX_AADHAAR_PHOTO_BYTES = 4 * 1024 * 1024;
 const PHOTO_REQUIRED_MESSAGE = 'Upload the front of the Aadhaar card';
