@@ -32,6 +32,9 @@ const nextConfig: NextConfig = {
     serverExternalPackages: ['@node-rs/argon2', 'tesseract.js'],
     outputFileTracingIncludes: {
         '/api/v1/aadhaar-photos': ['./node_modules/@tesseract.js-data/*/4.0.0_best_int/*.gz'],
+        '/api/v1/bookings': ['./public/images/crest-email.png'],
+        '/api/v1/bookings/[id]/confirmation-emails': ['./public/images/crest-email.png'],
+        '/api/v1/email-verifications': ['./public/images/crest-email.png'],
     },
     sassOptions: { loadPaths: [path.join(process.cwd(), 'src/styles')] },
     async headers() {
