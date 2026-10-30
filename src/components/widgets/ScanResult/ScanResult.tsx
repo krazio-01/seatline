@@ -18,7 +18,12 @@ import { StatTiles } from '@/components/widgets/StatTiles/StatTiles';
 import { useAppContext, useUpdateAppContext } from '@/context/appContext';
 import { INITIAL_SCANNER, type CheckInCounts, type ScannerState } from '@/context/appStore';
 import { api } from '@/services/client/api';
-import { ZONE_LABELS, type CheckInGuest, type CheckInResult } from '@/types/booking';
+import {
+    ZONE_LABELS,
+    type CardCheck,
+    type CheckInGuest,
+    type CheckInResult,
+} from '@/types/booking';
 import { formatDate } from '@/utils/dates';
 import { pluralize } from '@/utils/text';
 
@@ -54,6 +59,11 @@ const TALLY_LABELS: Record<CheckInResult['outcome'], string> = {
     invalid: 'Invalid',
 };
 
+const CARD_CHECK_NOTES: Record<Exclude<CardCheck, 'verified'>, string> = {
+    mismatch: 'Card number did not match. Check the physical card',
+    unverified: 'Card not verified. Check the physical card',
+};
+
 const THUMBNAIL_SIZE = { width: 56, height: 36 };
 const SINGLE_PULSE_MS = 60;
 const WARNING_PULSE_MS = [80, 60, 80];
@@ -83,6 +93,10 @@ function GuestCards({ guests }: { guests: CheckInGuest[] }) {
                     const src = guest.photoToken
                         ? api.aadhaarPhotos.maskedUrl(guest.photoToken)
                         : null;
+                    const cardNote =
+                        guest.cardCheck && guest.cardCheck !== 'verified'
+                            ? CARD_CHECK_NOTES[guest.cardCheck]
+                            : null;
 
                     return (
                         <li key={index} className="scan-result-guest">
@@ -105,10 +119,15 @@ function GuestCards({ guests }: { guests: CheckInGuest[] }) {
                                 </button>
                             ) : (
                                 <span className="scan-result-guest-photo" data-empty="true">
-                                    No photo
+                                    {cardNote ? 'Check ID' : 'No photo'}
                                 </span>
                             )}
-                            <span className="scan-result-guest-name">{guest.name}</span>
+                            <span className="scan-result-guest-text">
+                                <span className="scan-result-guest-name">{guest.name}</span>
+                                {cardNote && (
+                                    <span className="scan-result-guest-note">{cardNote}</span>
+                                )}
+                            </span>
                         </li>
                     );
                 })}
