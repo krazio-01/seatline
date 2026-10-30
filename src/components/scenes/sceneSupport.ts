@@ -2,9 +2,6 @@ import { useSyncExternalStore } from 'react';
 
 export type WebglSupport = { isSupported: boolean; isSoftware: boolean };
 
-type NetworkInformationHints = { saveData?: boolean; effectiveType?: string };
-
-const SLOW_EFFECTIVE_TYPES = new Set(['slow-2g', '2g', '3g']);
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 const CONSTRAINED_DEVICE_QUERY = '(pointer: coarse), (max-width: 700px)';
 const SOFTWARE_RENDERER = /swiftshader|llvmpipe|softpipe|software/i;
@@ -12,15 +9,6 @@ const SERVER_WEBGL_SUPPORT: WebglSupport = { isSupported: false, isSoftware: fal
 const FLYPAST_WAIT_MS = 6000;
 let cachedWebglSupport: WebglSupport | null = null;
 let flypastSignal: { promise: Promise<void>; resolve: () => void } | null = null;
-
-function isSlowConnection(): boolean {
-    const connection = (navigator as Navigator & { connection?: NetworkInformationHints })
-        .connection;
-
-    return (
-        Boolean(connection?.saveData) || SLOW_EFFECTIVE_TYPES.has(connection?.effectiveType ?? '')
-    );
-}
 
 function subscribeToReducedMotion(onChange: () => void) {
     const query = matchMedia(REDUCED_MOTION_QUERY);
@@ -63,7 +51,6 @@ export function isConstrainedDevice(): boolean {
 }
 
 export function canRunScenes({ allowReducedMotion = false } = {}): boolean {
-    if (isSlowConnection()) return false;
     if (!allowReducedMotion && matchMedia(REDUCED_MOTION_QUERY).matches) return false;
 
     return readWebglSupport().isSupported;
